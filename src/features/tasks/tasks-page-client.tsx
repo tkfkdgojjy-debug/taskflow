@@ -75,6 +75,7 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
   const taskItems = useTaskStore((state) => state.tasks);
   const projects = useTaskStore((state) => state.projects);
   const columns = useTaskStore((state) => state.columns);
+  const deleteTask = useTaskStore((state) => state.deleteTask);
   const updateTask = useTaskStore((state) => state.updateTask);
   const moveTask = useTaskStore((state) => state.moveTask);
   const [view, setView] = useState<TaskView>("table");
@@ -337,6 +338,10 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
         activities={activities}
         isOpen={Boolean(selectedTask)}
         onClose={() => setSelectedTaskId(null)}
+        onDeleteTask={(taskId) => {
+          deleteTask(taskId);
+          setSelectedTaskId(null);
+        }}
         onUpdateTask={updateTask}
         project={selectedProject}
         task={selectedTask}

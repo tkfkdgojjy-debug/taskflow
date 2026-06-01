@@ -9,10 +9,12 @@ import {
   MessageSquare,
   Plus,
   Send,
+  Trash2,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { appTransition, softSpring } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { Activity, Project, Task, TaskPriority, TaskStatus, User } from "@/types";
@@ -36,6 +38,7 @@ interface TaskDetailPanelProps {
   activities: Activity[];
   isOpen: boolean;
   onClose: () => void;
+  onDeleteTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   project?: Project;
   task?: Task;
@@ -134,6 +137,7 @@ export function TaskDetailPanel({
   activities,
   isOpen,
   onClose,
+  onDeleteTask,
   onUpdateTask,
   project,
   task,
@@ -141,6 +145,7 @@ export function TaskDetailPanel({
 }: TaskDetailPanelProps) {
   const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>(defaultChecklist);
   const [comments, setComments] = useState<Record<string, Comment[]>>(defaultComments);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [newComment, setNewComment] = useState("");
 
@@ -224,6 +229,14 @@ export function TaskDetailPanel({
     setNewComment("");
   }
 
+  function deleteSelectedTask() {
+    if (!task) return;
+
+    onDeleteTask(task.id);
+    setIsDeleteConfirmOpen(false);
+    onClose();
+  }
+
   return (
     <AnimatePresence>
       {isOpen && task ? (
@@ -258,9 +271,21 @@ export function TaskDetailPanel({
                 <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
                 <span className="truncate">{project?.name ?? "프로젝트 없음"}</span>
               </div>
-              <Button type="button" variant="ghost" size="icon" className="size-9" aria-label="패널 닫기" onClick={onClose}>
-                <X />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 text-destructive hover:bg-destructive/10"
+                  aria-label="작업 삭제"
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                >
+                  <Trash2 />
+                </Button>
+                <Button type="button" variant="ghost" size="icon" className="size-9" aria-label="패널 닫기" onClick={onClose}>
+                  <X />
+                </Button>
+              </div>
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
@@ -460,6 +485,15 @@ export function TaskDetailPanel({
             </div>
           </>
           </motion.aside>
+
+          <ConfirmDialog
+            confirmLabel="삭제"
+            description="이 작업과 상세 내용이 목록에서 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+            isOpen={isDeleteConfirmOpen}
+            onClose={() => setIsDeleteConfirmOpen(false)}
+            onConfirm={deleteSelectedTask}
+            title="이 작업을 삭제할까요?"
+          />
         </motion.div>
       ) : null}
     </AnimatePresence>
