@@ -34,6 +34,7 @@ interface TaskState {
   setSelectedProject: (projectId: ID) => void;
   setFilters: (filters: Partial<TaskFilters>) => void;
   resetFilters: () => void;
+  clearTasks: () => void;
   createTask: (input: CreateTaskInput) => Task;
   updateTask: (taskId: ID, patch: Partial<Task>) => void;
   deleteTask: (taskId: ID) => void;
@@ -94,6 +95,7 @@ export const useTaskStore = create<TaskState>()(
             },
           })),
         resetFilters: () => set({ filters: defaultFilters }),
+        clearTasks: () => set({ tasks: [] }),
         createTask: (input) => {
           const now = new Date().toISOString();
           const columnTasks = get().tasks.filter((task) => task.columnId === input.columnId);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, Database, Moon, ShieldCheck, Sun, UserRound } from "lucide-react";
+import { Bell, Database, Moon, ShieldCheck, Sun, Trash2, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -15,7 +15,9 @@ export function SettingsPageClient() {
   const { toast } = useToast();
   const themeMode = useUIStore((state) => state.themeMode);
   const setThemeMode = useUIStore((state) => state.setThemeMode);
+  const clearTasks = useTaskStore((state) => state.clearTasks);
   const tasks = useTaskStore((state) => state.tasks);
+  const [isClearTasksConfirmOpen, setIsClearTasksConfirmOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [weeklyDigest, setWeeklyDigest] = useState(true);
@@ -34,6 +36,16 @@ export function SettingsPageClient() {
     toast({
       title: "로컬 데이터가 삭제되었습니다",
       description: "앱을 새로고침하면 기본 목 워크스페이스가 복원됩니다.",
+      variant: "success",
+    });
+  }
+
+  function clearSampleTasks() {
+    clearTasks();
+    setIsClearTasksConfirmOpen(false);
+    toast({
+      title: "샘플 작업을 비웠습니다",
+      description: "작업 목록의 샘플 데이터가 삭제되었습니다.",
       variant: "success",
     });
   }
@@ -164,6 +176,24 @@ export function SettingsPageClient() {
             </Button>
           </section>
 
+          <section className="rounded-lg border bg-card p-5 shadow-xs">
+            <div className="grid size-10 place-items-center rounded-lg border bg-terracotta/15 text-muted-foreground">
+              <Trash2 className="size-5" />
+            </div>
+            <h2 className="mt-4 text-base font-semibold">샘플 작업 비우기</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              처음 제공된 샘플 작업들을 모두 삭제하고 빈 작업 목록으로 시작합니다.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4 w-full text-destructive hover:bg-destructive/10"
+              onClick={() => setIsClearTasksConfirmOpen(true)}
+            >
+              샘플 작업 전체 삭제
+            </Button>
+          </section>
+
           <EmptyState
             icon={Database}
             title="연동된 서비스가 없습니다"
@@ -171,6 +201,15 @@ export function SettingsPageClient() {
           />
         </aside>
       </section>
+
+      <ConfirmDialog
+        confirmLabel="전체 삭제"
+        description="현재 작업 목록의 모든 샘플 작업이 삭제됩니다. 삭제 후에는 빈 작업 목록으로 시작합니다."
+        isOpen={isClearTasksConfirmOpen}
+        onClose={() => setIsClearTasksConfirmOpen(false)}
+        onConfirm={clearSampleTasks}
+        title="샘플 작업을 모두 삭제할까요?"
+      />
 
       <ConfirmDialog
         confirmLabel="데이터 삭제"
