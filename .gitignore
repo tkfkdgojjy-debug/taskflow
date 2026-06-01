@@ -1,0 +1,30 @@
+.next/
+node_modules/
+dev-server*.log
+
+# env
+.env
+.env*.local
+
+# vercel
+.vercel/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# build outputs
+out/
+dist/
+coverage/
+
+# legacy static prototype files
+index.html
+script.js
+style.css
+
+# system
+.DS_Store
+Thumbs.db
