@@ -50,6 +50,16 @@ interface MoveTaskInput {
   targetIndex: number;
 }
 
+export interface TaskStoreSnapshot {
+  workspaces: Workspace[];
+  projects: Project[];
+  goals: GoalItem[];
+  columns: BoardColumn[];
+  tasks: Task[];
+  selectedWorkspaceId: ID;
+  selectedProjectId: ID;
+}
+
 interface TaskState {
   workspaces: Workspace[];
   projects: Project[];
@@ -63,6 +73,7 @@ interface TaskState {
   setSelectedProject: (projectId: ID) => void;
   setFilters: (filters: Partial<TaskFilters>) => void;
   resetFilters: () => void;
+  hydrateFromSnapshot: (snapshot: Partial<TaskStoreSnapshot>) => void;
   clearTasks: () => void;
   createProject: (input: CreateProjectInput) => Project;
   createGoal: (input: CreateGoalInput) => GoalItem;
@@ -102,6 +113,38 @@ function reorderTasks(tasks: Task[], columnId: ID): Task[] {
   });
 }
 
+function withDefaultProjects(projects: Project[]) {
+  const existingProjectIds = new Set(projects.map((project) => project.id));
+  const missingDefaultProjects = mockProjects
+    .filter(
+      (defaultProject) =>
+        !projects.some(
+          (project) =>
+            project.category === defaultProject.category &&
+            (project.clientName ?? defaultClientName) === (defaultProject.clientName ?? defaultClientName),
+        ),
+    )
+    .map((project) =>
+      existingProjectIds.has(project.id)
+        ? { ...project, id: `${project.id}-${project.category ?? "default"}` }
+        : project,
+    );
+
+  return [...projects, ...missingDefaultProjects];
+}
+
+export function getTaskStoreSnapshot(state: TaskState): TaskStoreSnapshot {
+  return {
+    workspaces: state.workspaces,
+    projects: state.projects,
+    goals: state.goals,
+    columns: state.columns,
+    tasks: state.tasks,
+    selectedWorkspaceId: state.selectedWorkspaceId,
+    selectedProjectId: state.selectedProjectId,
+  };
+}
+
 export const useTaskStore = create<TaskState>()(
   devtools(
     persist(
@@ -130,6 +173,16 @@ export const useTaskStore = create<TaskState>()(
             },
           })),
         resetFilters: () => set({ filters: defaultFilters }),
+        hydrateFromSnapshot: (snapshot) =>
+          set((state) => ({
+            workspaces: snapshot.workspaces ?? state.workspaces,
+            projects: withDefaultProjects(snapshot.projects ?? state.projects),
+            goals: snapshot.goals ?? state.goals,
+            columns: snapshot.columns ?? state.columns,
+            tasks: snapshot.tasks ?? state.tasks,
+            selectedWorkspaceId: snapshot.selectedWorkspaceId ?? state.selectedWorkspaceId,
+            selectedProjectId: snapshot.selectedProjectId ?? state.selectedProjectId,
+          })),
         clearTasks: () => set({ tasks: [] }),
         createGoal: (input) => {
           const now = new Date().toISOString();
@@ -289,27 +342,11 @@ export const useTaskStore = create<TaskState>()(
           const persistedState = (persisted ?? {}) as Partial<TaskState>;
           const persistedProjects = persistedState.projects ?? current.projects;
           const persistedGoals = persistedState.goals ?? current.goals;
-          const existingProjectIds = new Set(persistedProjects.map((project) => project.id));
-          const missingDefaultProjects = mockProjects
-            .filter(
-              (defaultProject) =>
-                !persistedProjects.some(
-                  (project) =>
-                    project.category === defaultProject.category &&
-                    (project.clientName ?? defaultClientName) ===
-                      (defaultProject.clientName ?? defaultClientName),
-                ),
-            )
-            .map((project) =>
-              existingProjectIds.has(project.id)
-                ? { ...project, id: `${project.id}-${project.category ?? "default"}` }
-                : project,
-            );
 
           return {
             ...current,
             ...persistedState,
-            projects: [...persistedProjects, ...missingDefaultProjects],
+            projects: withDefaultProjects(persistedProjects),
             goals: persistedGoals,
           };
         },
