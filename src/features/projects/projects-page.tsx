@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarClock, FolderKanban, Trash2 } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { CalendarClock, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -32,11 +32,19 @@ function getProjectStats(projectId: string, tasks: Task[]) {
   };
 }
 
+const projectColors = ["#B9A7C9", "#A8BBA3", "#A9B9C9", "#D8CBB8", "#C89B87"];
+
 export function ProjectsPage() {
   const projects = useTaskStore((state) => state.projects);
   const tasks = useTaskStore((state) => state.tasks);
+  const createProject = useTaskStore((state) => state.createProject);
   const deleteProject = useTaskStore((state) => state.deleteProject);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [newProjectDueDate, setNewProjectDueDate] = useState("");
+  const [newProjectColor, setNewProjectColor] = useState(projectColors[0]);
   const totalTasks = tasks.length;
   const projectToDelete = projects.find((project) => project.id === deleteProjectId);
 
@@ -44,6 +52,25 @@ export function ProjectsPage() {
     if (!deleteProjectId) return;
     deleteProject(deleteProjectId);
     setDeleteProjectId(null);
+  }
+
+  function handleCreateProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newProjectName.trim()) return;
+
+    createProject({
+      name: newProjectName.trim(),
+      description: newProjectDescription.trim() || "새 프로젝트 설명을 추가하세요.",
+      color: newProjectColor,
+      dueDate: newProjectDueDate ? `${newProjectDueDate}T09:00:00.000Z` : undefined,
+      status: "active",
+    });
+
+    setNewProjectName("");
+    setNewProjectDescription("");
+    setNewProjectDueDate("");
+    setNewProjectColor(projectColors[0]);
+    setIsCreateOpen(false);
   }
 
   return (
@@ -60,9 +87,65 @@ export function ProjectsPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="rounded-full">내보내기</Button>
-          <Button className="rounded-full bg-terracotta/76 text-[#442d25] hover:bg-terracotta dark:text-[#1d130f]">새 프로젝트</Button>
+          <Button
+            type="button"
+            className="rounded-full bg-terracotta/76 text-[#442d25] hover:bg-terracotta dark:text-[#1d130f]"
+            onClick={() => setIsCreateOpen((current) => !current)}
+          >
+            <Plus />
+            새 프로젝트
+          </Button>
         </div>
       </section>
+
+      {isCreateOpen ? (
+        <form className="rounded-2xl bg-card/86 p-6 shadow-xs backdrop-blur" onSubmit={handleCreateProject}>
+          <div className="grid gap-3 lg:grid-cols-[1fr_170px_auto] lg:items-end">
+            <label className="block">
+              <span className="mb-2 block text-xs font-medium text-muted-foreground">프로젝트 이름</span>
+              <input
+                value={newProjectName}
+                onChange={(event) => setNewProjectName(event.target.value)}
+                placeholder="새 프로젝트 이름"
+                className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-xs font-medium text-muted-foreground">마감일</span>
+              <input
+                type="date"
+                value={newProjectDueDate}
+                onChange={(event) => setNewProjectDueDate(event.target.value)}
+                className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+              />
+            </label>
+            <Button type="submit" className="rounded-full" disabled={!newProjectName.trim()}>
+              프로젝트 추가
+            </Button>
+          </div>
+          <textarea
+            value={newProjectDescription}
+            onChange={(event) => setNewProjectDescription(event.target.value)}
+            placeholder="프로젝트 설명"
+            className="mt-3 min-h-20 w-full resize-none rounded-2xl bg-background/70 px-4 py-3 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+          />
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">색상</span>
+            {projectColors.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`size-7 rounded-full transition-transform ${
+                  newProjectColor === color ? "scale-110 ring-2 ring-ring ring-offset-2 ring-offset-card" : ""
+                }`}
+                style={{ backgroundColor: color }}
+                aria-label={`${color} 선택`}
+                onClick={() => setNewProjectColor(color)}
+              />
+            ))}
+          </div>
+        </form>
+      ) : null}
 
       <section className="rounded-2xl bg-card/82 p-7 shadow-xs backdrop-blur md:p-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

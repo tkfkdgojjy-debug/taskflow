@@ -6,7 +6,7 @@ import type { BoardColumn, ID, Project, Task, TaskFilters, TaskStatus, Workspace
 interface CreateTaskInput {
   title: string;
   projectId: ID;
-  columnId: ID;
+  columnId?: ID;
   createdBy: ID;
   description?: string;
   priority?: Task["priority"];
@@ -14,6 +14,14 @@ interface CreateTaskInput {
   labelIds?: ID[];
   dueDate?: string;
   estimateHours?: number;
+}
+
+interface CreateProjectInput {
+  name: string;
+  description: string;
+  color?: string;
+  dueDate?: string;
+  status?: Project["status"];
 }
 
 interface MoveTaskInput {
@@ -35,6 +43,7 @@ interface TaskState {
   setFilters: (filters: Partial<TaskFilters>) => void;
   resetFilters: () => void;
   clearTasks: () => void;
+  createProject: (input: CreateProjectInput) => Project;
   createTask: (input: CreateTaskInput) => Task;
   deleteProject: (projectId: ID) => void;
   updateTask: (taskId: ID, patch: Partial<Task>) => void;
@@ -97,18 +106,39 @@ export const useTaskStore = create<TaskState>()(
           })),
         resetFilters: () => set({ filters: defaultFilters }),
         clearTasks: () => set({ tasks: [] }),
+        createProject: (input) => {
+          const now = new Date().toISOString();
+          const project: Project = {
+            id: crypto.randomUUID(),
+            workspaceId: get().selectedWorkspaceId,
+            name: input.name,
+            description: input.description,
+            status: input.status ?? "active",
+            color: input.color ?? "#B9A7C9",
+            dueDate: input.dueDate,
+            createdAt: now,
+            updatedAt: now,
+          };
+
+          set((state) => ({
+            projects: [...state.projects, project],
+            selectedProjectId: project.id,
+          }));
+          return project;
+        },
         createTask: (input) => {
           const now = new Date().toISOString();
-          const columnTasks = get().tasks.filter((task) => task.columnId === input.columnId);
+          const columnId = input.columnId ?? columnFromStatus(get().columns, "todo") ?? get().columns[0]?.id ?? "";
+          const columnTasks = get().tasks.filter((task) => task.columnId === columnId);
           const project = get().projects.find((item) => item.id === input.projectId);
           const task: Task = {
             id: crypto.randomUUID(),
             workspaceId: project?.workspaceId ?? get().selectedWorkspaceId,
             projectId: input.projectId,
-            columnId: input.columnId,
+            columnId,
             title: input.title,
             description: input.description,
-            status: statusFromColumn(get().columns, input.columnId),
+            status: statusFromColumn(get().columns, columnId),
             priority: input.priority ?? "medium",
             assigneeIds: input.assigneeIds ?? [],
             labelIds: input.labelIds ?? [],

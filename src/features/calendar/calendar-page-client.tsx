@@ -5,12 +5,8 @@ import { ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Project, Task } from "@/types";
-
-interface CalendarPageClientProps {
-  projects: Project[];
-  tasks: Task[];
-}
+import { useTaskStore } from "@/store/task-store";
+import type { Task } from "@/types";
 
 const weekDays = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -53,7 +49,9 @@ function buildMonthDays(monthDate: Date) {
   });
 }
 
-export function CalendarPageClient({ projects, tasks }: CalendarPageClientProps) {
+export function CalendarPageClient() {
+  const projects = useTaskStore((state) => state.projects);
+  const tasks = useTaskStore((state) => state.tasks);
   const initialDate = new Date("2026-06-03T09:00:00.000Z");
   const [visibleMonth, setVisibleMonth] = useState(initialDate);
   const [selectedDate, setSelectedDate] = useState(initialDate);
@@ -140,20 +138,23 @@ export function CalendarPageClient({ projects, tasks }: CalendarPageClientProps)
                       {date.getDate()}
                     </span>
                     {dayTasks.length > 0 ? (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      <span className="rounded-full bg-primary/18 px-2 py-0.5 text-[11px] font-semibold text-foreground ring-1 ring-primary/24">
                         {dayTasks.length}
                       </span>
                     ) : null}
                   </div>
 
                   <div className="mt-3 space-y-1.5">
-                    {dayTasks.slice(0, 1).map((task) => {
+                    {dayTasks.slice(0, 2).map((task) => {
                       const project = getProject(task);
 
                       return (
-                        <div key={task.id} className="truncate rounded-full bg-muted/72 px-2.5 py-1 text-[11px]">
-                          <span className="mr-1 inline-block size-1.5 rounded-full" style={{ backgroundColor: project?.color }} />
-                          {task.title}
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-1.5 rounded-xl bg-primary/14 px-2.5 py-1 text-[11px] font-medium text-foreground ring-1 ring-primary/20"
+                        >
+                          <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: project?.color }} />
+                          <span className="truncate">{task.title}</span>
                         </div>
                       );
                     })}
@@ -187,7 +188,7 @@ export function CalendarPageClient({ projects, tasks }: CalendarPageClientProps)
                   const project = getProject(task);
 
                   return (
-                    <article key={task.id} className="rounded-2xl bg-secondary/58 p-4">
+                    <article key={task.id} className="rounded-2xl bg-primary/12 p-4 ring-1 ring-primary/18">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="line-clamp-2 text-sm font-medium">{task.title}</p>

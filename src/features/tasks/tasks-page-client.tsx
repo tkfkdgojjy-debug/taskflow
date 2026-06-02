@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   closestCorners,
   DndContext,
@@ -22,6 +22,7 @@ import {
   CalendarDays,
   Columns3,
   ListFilter,
+  Plus,
   Search,
   Table2,
 } from "lucide-react";
@@ -75,6 +76,7 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
   const taskItems = useTaskStore((state) => state.tasks);
   const projects = useTaskStore((state) => state.projects);
   const columns = useTaskStore((state) => state.columns);
+  const createTask = useTaskStore((state) => state.createTask);
   const deleteTask = useTaskStore((state) => state.deleteTask);
   const updateTask = useTaskStore((state) => state.updateTask);
   const moveTask = useTaskStore((state) => state.moveTask);
@@ -85,6 +87,12 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
   const [projectId, setProjectId] = useState<string>("all");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newTaskProjectId, setNewTaskProjectId] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>("medium");
+  const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -130,6 +138,7 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
   const selectedTask = taskItems.find((task) => task.id === selectedTaskId);
   const activeTask = taskItems.find((task) => task.id === activeTaskId);
   const selectedProject = selectedTask ? getProject(selectedTask) : undefined;
+  const createProjectId = newTaskProjectId || projects[0]?.id || "";
 
   function getProject(task: Task) {
     return projects.find((project) => project.id === task.projectId);
@@ -141,6 +150,28 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
 
   function openTaskDetail(taskId: string) {
     setSelectedTaskId(taskId);
+  }
+
+  function handleCreateTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newTaskTitle.trim() || !createProjectId) return;
+
+    const task = createTask({
+      title: newTaskTitle.trim(),
+      description: newTaskDescription.trim() || undefined,
+      projectId: createProjectId,
+      createdBy: users[0]?.id ?? "user-1",
+      priority: newTaskPriority,
+      dueDate: newTaskDueDate ? `${newTaskDueDate}T09:00:00.000Z` : undefined,
+    });
+
+    setNewTaskTitle("");
+    setNewTaskDescription("");
+    setNewTaskDueDate("");
+    setNewTaskPriority("medium");
+    setNewTaskProjectId(createProjectId);
+    setIsCreateOpen(false);
+    setSelectedTaskId(task.id);
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -192,29 +223,103 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
               스프레드시트처럼 무겁지 않게, 지금 집중해야 할 일을 가볍게 정리합니다.
             </p>
           </div>
-          <div className="flex rounded-full bg-card/72 p-1 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
-              variant={view === "table" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-9 rounded-full"
-              onClick={() => setView("table")}
+              className="rounded-full"
+              onClick={() => setIsCreateOpen((current) => !current)}
             >
-              <Table2 />
-              리스트
+              <Plus />
+              새 작업
             </Button>
-            <Button
-              type="button"
-              variant={view === "kanban" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-9 rounded-full"
-              onClick={() => setView("kanban")}
-            >
-              <Columns3 />
-              보드
-            </Button>
+            <div className="flex rounded-full bg-card/72 p-1 shadow-xs">
+              <Button
+                type="button"
+                variant={view === "table" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-9 rounded-full"
+                onClick={() => setView("table")}
+              >
+                <Table2 />
+                리스트
+              </Button>
+              <Button
+                type="button"
+                variant={view === "kanban" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-9 rounded-full"
+                onClick={() => setView("kanban")}
+              >
+                <Columns3 />
+                보드
+              </Button>
+            </div>
           </div>
         </section>
+
+        {isCreateOpen ? (
+          <form className="rounded-2xl bg-card/86 p-5 shadow-xs backdrop-blur" onSubmit={handleCreateTask}>
+            <div className="grid gap-3 lg:grid-cols-[1fr_180px_140px_150px_auto] lg:items-end">
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium text-muted-foreground">작업 제목</span>
+                <input
+                  value={newTaskTitle}
+                  onChange={(event) => setNewTaskTitle(event.target.value)}
+                  placeholder="새 작업을 입력하세요"
+                  className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium text-muted-foreground">프로젝트</span>
+                <select
+                  value={createProjectId}
+                  onChange={(event) => setNewTaskProjectId(event.target.value)}
+                  className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+                >
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium text-muted-foreground">우선순위</span>
+                <select
+                  value={newTaskPriority}
+                  onChange={(event) => setNewTaskPriority(event.target.value as TaskPriority)}
+                  className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+                >
+                  <option value="low">낮음</option>
+                  <option value="medium">보통</option>
+                  <option value="high">높음</option>
+                  <option value="urgent">긴급</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium text-muted-foreground">마감일</span>
+                <input
+                  type="date"
+                  value={newTaskDueDate}
+                  onChange={(event) => setNewTaskDueDate(event.target.value)}
+                  className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+                />
+              </label>
+              <Button type="submit" className="rounded-full" disabled={!newTaskTitle.trim() || !createProjectId}>
+                추가
+              </Button>
+            </div>
+            <textarea
+              value={newTaskDescription}
+              onChange={(event) => setNewTaskDescription(event.target.value)}
+              placeholder="설명을 추가하세요"
+              className="mt-3 min-h-20 w-full resize-none rounded-2xl bg-background/70 px-4 py-3 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+            />
+            {projects.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">작업을 추가하려면 먼저 프로젝트를 만들어주세요.</p>
+            ) : null}
+          </form>
+        ) : null}
 
         <section className="rounded-2xl bg-card/82 p-4 shadow-xs backdrop-blur">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
