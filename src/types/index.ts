@@ -38,6 +38,17 @@ export interface Project {
   updatedAt: ISODateString;
 }
 
+export interface GoalItem {
+  id: ID;
+  workspaceId: ID;
+  projectId: ID;
+  title: string;
+  description: string;
+  target: number;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
 export interface BoardColumn {
   id: ID;
   projectId: ID;

@@ -1,8 +1,18 @@
 import { create } from "zustand";
 import { createJSONStorage, devtools, persist } from "zustand/middleware";
 import { defaultClientName, getProjectCategoryColor } from "@/constants/project-categories";
-import { mockColumns, mockProjects, mockTasks, mockWorkspaces } from "@/data/mock-data";
-import type { BoardColumn, ID, Project, ProjectCategory, Task, TaskFilters, TaskStatus, Workspace } from "@/types";
+import { mockColumns, mockGoals, mockProjects, mockTasks, mockWorkspaces } from "@/data/mock-data";
+import type {
+  BoardColumn,
+  GoalItem,
+  ID,
+  Project,
+  ProjectCategory,
+  Task,
+  TaskFilters,
+  TaskStatus,
+  Workspace,
+} from "@/types";
 
 interface CreateTaskInput {
   title: string;
@@ -27,6 +37,13 @@ interface CreateProjectInput {
   status?: Project["status"];
 }
 
+interface CreateGoalInput {
+  projectId: ID;
+  title: string;
+  description: string;
+  target: number;
+}
+
 interface MoveTaskInput {
   taskId: ID;
   targetColumnId: ID;
@@ -36,6 +53,7 @@ interface MoveTaskInput {
 interface TaskState {
   workspaces: Workspace[];
   projects: Project[];
+  goals: GoalItem[];
   columns: BoardColumn[];
   tasks: Task[];
   selectedWorkspaceId: ID;
@@ -47,8 +65,11 @@ interface TaskState {
   resetFilters: () => void;
   clearTasks: () => void;
   createProject: (input: CreateProjectInput) => Project;
+  createGoal: (input: CreateGoalInput) => GoalItem;
+  deleteGoal: (goalId: ID) => void;
   createTask: (input: CreateTaskInput) => Task;
   deleteProject: (projectId: ID) => void;
+  updateGoal: (goalId: ID, patch: Partial<GoalItem>) => void;
   updateTask: (taskId: ID, patch: Partial<Task>) => void;
   deleteTask: (taskId: ID) => void;
   moveTask: (input: MoveTaskInput) => void;
@@ -87,6 +108,7 @@ export const useTaskStore = create<TaskState>()(
       (set, get) => ({
         workspaces: mockWorkspaces,
         projects: mockProjects,
+        goals: mockGoals,
         columns: mockColumns,
         tasks: mockTasks,
         selectedWorkspaceId: mockWorkspaces[0]?.id ?? "",
@@ -109,6 +131,23 @@ export const useTaskStore = create<TaskState>()(
           })),
         resetFilters: () => set({ filters: defaultFilters }),
         clearTasks: () => set({ tasks: [] }),
+        createGoal: (input) => {
+          const now = new Date().toISOString();
+          const project = get().projects.find((item) => item.id === input.projectId);
+          const goal: GoalItem = {
+            id: crypto.randomUUID(),
+            workspaceId: project?.workspaceId ?? get().selectedWorkspaceId,
+            projectId: input.projectId,
+            title: input.title,
+            description: input.description,
+            target: Math.max(1, Math.round(input.target)),
+            createdAt: now,
+            updatedAt: now,
+          };
+
+          set((state) => ({ goals: [...state.goals, goal] }));
+          return goal;
+        },
         createProject: (input) => {
           const now = new Date().toISOString();
           const project: Project = {
@@ -131,6 +170,10 @@ export const useTaskStore = create<TaskState>()(
           }));
           return project;
         },
+        deleteGoal: (goalId) =>
+          set((state) => ({
+            goals: state.goals.filter((goal) => goal.id !== goalId),
+          })),
         createTask: (input) => {
           const now = new Date().toISOString();
           const columnId = input.columnId ?? columnFromStatus(get().columns, "todo") ?? get().columns[0]?.id ?? "";
@@ -168,10 +211,24 @@ export const useTaskStore = create<TaskState>()(
 
             return {
               projects: nextProjects,
+              goals: state.goals.filter((goal) => goal.projectId !== projectId),
               selectedProjectId: nextSelectedProjectId,
               tasks: state.tasks.filter((task) => task.projectId !== projectId),
             };
           }),
+        updateGoal: (goalId, patch) =>
+          set((state) => ({
+            goals: state.goals.map((goal) =>
+              goal.id === goalId
+                ? {
+                    ...goal,
+                    ...patch,
+                    target: patch.target ? Math.max(1, Math.round(patch.target)) : goal.target,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : goal,
+            ),
+          })),
         updateTask: (taskId, patch) =>
           set((state) => ({
             tasks: state.tasks.map((task) => {
@@ -229,8 +286,9 @@ export const useTaskStore = create<TaskState>()(
         name: "task-management-store-ko",
         storage: createJSONStorage(() => localStorage),
         merge: (persisted, current) => {
-          const persistedState = persisted as Partial<TaskState>;
+          const persistedState = (persisted ?? {}) as Partial<TaskState>;
           const persistedProjects = persistedState.projects ?? current.projects;
+          const persistedGoals = persistedState.goals ?? current.goals;
           const existingProjectIds = new Set(persistedProjects.map((project) => project.id));
           const missingDefaultProjects = mockProjects
             .filter(
@@ -252,10 +310,12 @@ export const useTaskStore = create<TaskState>()(
             ...current,
             ...persistedState,
             projects: [...persistedProjects, ...missingDefaultProjects],
+            goals: persistedGoals,
           };
         },
         partialize: (state) => ({
           projects: state.projects,
+          goals: state.goals,
           tasks: state.tasks,
           selectedWorkspaceId: state.selectedWorkspaceId,
           selectedProjectId: state.selectedProjectId,

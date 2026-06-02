@@ -3,6 +3,7 @@ import type {
   BoardColumn,
   BurndownPoint,
   DashboardMetric,
+  GoalItem,
   Project,
   Task,
   TaskLabel,
@@ -145,6 +146,29 @@ export const mockTasks: Task[] = [
     createdAt: "2026-05-18T09:00:00.000Z",
     updatedAt: "2026-05-28T09:00:00.000Z",
     completedAt: "2026-05-28T09:00:00.000Z",
+  },
+];
+
+export const mockGoals: GoalItem[] = [
+  {
+    id: "goal-1",
+    workspaceId: "workspace-1",
+    projectId: "project-1",
+    title: "고정업무 안정화",
+    description: "반복 업무를 놓치지 않도록 완료 흐름을 안정화합니다.",
+    target: 5,
+    createdAt: "2026-05-20T09:00:00.000Z",
+    updatedAt: "2026-05-20T09:00:00.000Z",
+  },
+  {
+    id: "goal-2",
+    workspaceId: "workspace-1",
+    projectId: "project-2",
+    title: "정산 누락 줄이기",
+    description: "정산 관련 작업을 한 곳에서 추적하고 마감 전 완료합니다.",
+    target: 4,
+    createdAt: "2026-05-21T09:00:00.000Z",
+    updatedAt: "2026-05-21T09:00:00.000Z",
   },
 ];
 
