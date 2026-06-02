@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { createJSONStorage, devtools, persist } from "zustand/middleware";
+import { defaultClientName, getProjectCategoryColor } from "@/constants/project-categories";
 import { mockColumns, mockProjects, mockTasks, mockWorkspaces } from "@/data/mock-data";
-import type { BoardColumn, ID, Project, Task, TaskFilters, TaskStatus, Workspace } from "@/types";
+import type { BoardColumn, ID, Project, ProjectCategory, Task, TaskFilters, TaskStatus, Workspace } from "@/types";
 
 interface CreateTaskInput {
   title: string;
@@ -19,6 +20,8 @@ interface CreateTaskInput {
 interface CreateProjectInput {
   name: string;
   description: string;
+  category?: ProjectCategory;
+  clientName?: string;
   color?: string;
   dueDate?: string;
   status?: Project["status"];
@@ -113,8 +116,10 @@ export const useTaskStore = create<TaskState>()(
             workspaceId: get().selectedWorkspaceId,
             name: input.name,
             description: input.description,
+            category: input.category ?? "other",
+            clientName: input.clientName?.trim() || defaultClientName,
             status: input.status ?? "active",
-            color: input.color ?? "#B9A7C9",
+            color: input.color ?? getProjectCategoryColor(input.category),
             dueDate: input.dueDate,
             createdAt: now,
             updatedAt: now,
@@ -223,6 +228,32 @@ export const useTaskStore = create<TaskState>()(
       {
         name: "task-management-store-ko",
         storage: createJSONStorage(() => localStorage),
+        merge: (persisted, current) => {
+          const persistedState = persisted as Partial<TaskState>;
+          const persistedProjects = persistedState.projects ?? current.projects;
+          const existingProjectIds = new Set(persistedProjects.map((project) => project.id));
+          const missingDefaultProjects = mockProjects
+            .filter(
+              (defaultProject) =>
+                !persistedProjects.some(
+                  (project) =>
+                    project.category === defaultProject.category &&
+                    (project.clientName ?? defaultClientName) ===
+                      (defaultProject.clientName ?? defaultClientName),
+                ),
+            )
+            .map((project) =>
+              existingProjectIds.has(project.id)
+                ? { ...project, id: `${project.id}-${project.category ?? "default"}` }
+                : project,
+            );
+
+          return {
+            ...current,
+            ...persistedState,
+            projects: [...persistedProjects, ...missingDefaultProjects],
+          };
+        },
         partialize: (state) => ({
           projects: state.projects,
           tasks: state.tasks,

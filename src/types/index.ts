@@ -3,6 +3,7 @@ export type ISODateString = string;
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type TaskStatus = "backlog" | "todo" | "in_progress" | "review" | "done";
+export type ProjectCategory = "fixed" | "settlement" | "planning" | "meeting" | "monitoring" | "mail" | "other";
 export type ProjectStatus = "planning" | "active" | "on_hold" | "completed";
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 
@@ -28,6 +29,8 @@ export interface Project {
   workspaceId: ID;
   name: string;
   description: string;
+  category?: ProjectCategory;
+  clientName?: string;
   status: ProjectStatus;
   color: string;
   dueDate?: ISODateString;

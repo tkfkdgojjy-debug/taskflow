@@ -5,8 +5,14 @@ import { CalendarClock, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  defaultClientName,
+  getProjectCategoryColor,
+  getProjectCategoryLabel,
+  projectCategoryOptions,
+} from "@/constants/project-categories";
 import { useTaskStore } from "@/store/task-store";
-import type { Task } from "@/types";
+import type { ProjectCategory, Task } from "@/types";
 
 function formatDate(value?: string) {
   if (!value) return "날짜 없음";
@@ -32,7 +38,7 @@ function getProjectStats(projectId: string, tasks: Task[]) {
   };
 }
 
-const projectColors = ["#B9A7C9", "#A8BBA3", "#A9B9C9", "#D8CBB8", "#C89B87"];
+const projectColors = projectCategoryOptions.map((category) => category.color);
 
 export function ProjectsPage() {
   const projects = useTaskStore((state) => state.projects);
@@ -43,8 +49,10 @@ export function ProjectsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [newProjectClientName, setNewProjectClientName] = useState(defaultClientName);
+  const [newProjectCategory, setNewProjectCategory] = useState<ProjectCategory>("fixed");
   const [newProjectDueDate, setNewProjectDueDate] = useState("");
-  const [newProjectColor, setNewProjectColor] = useState(projectColors[0]);
+  const [newProjectColor, setNewProjectColor] = useState(getProjectCategoryColor("fixed"));
   const totalTasks = tasks.length;
   const projectToDelete = projects.find((project) => project.id === deleteProjectId);
 
@@ -56,11 +64,16 @@ export function ProjectsPage() {
 
   function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!newProjectName.trim()) return;
+
+    const clientName = newProjectClientName.trim() || defaultClientName;
+    const categoryLabel = getProjectCategoryLabel(newProjectCategory);
+    const projectName = newProjectName.trim() || `${clientName} · ${categoryLabel}`;
 
     createProject({
-      name: newProjectName.trim(),
-      description: newProjectDescription.trim() || "새 프로젝트 설명을 추가하세요.",
+      name: projectName,
+      description: newProjectDescription.trim() || `${clientName} ${categoryLabel} 업무입니다.`,
+      category: newProjectCategory,
+      clientName,
       color: newProjectColor,
       dueDate: newProjectDueDate ? `${newProjectDueDate}T09:00:00.000Z` : undefined,
       status: "active",
@@ -68,8 +81,10 @@ export function ProjectsPage() {
 
     setNewProjectName("");
     setNewProjectDescription("");
+    setNewProjectClientName(defaultClientName);
+    setNewProjectCategory("fixed");
     setNewProjectDueDate("");
-    setNewProjectColor(projectColors[0]);
+    setNewProjectColor(getProjectCategoryColor("fixed"));
     setIsCreateOpen(false);
   }
 
@@ -100,15 +115,42 @@ export function ProjectsPage() {
 
       {isCreateOpen ? (
         <form className="rounded-2xl bg-card/86 p-6 shadow-xs backdrop-blur" onSubmit={handleCreateProject}>
-          <div className="grid gap-3 lg:grid-cols-[1fr_170px_auto] lg:items-end">
+          <div className="grid gap-3 lg:grid-cols-[1fr_160px_170px_170px_auto] lg:items-end">
             <label className="block">
               <span className="mb-2 block text-xs font-medium text-muted-foreground">프로젝트 이름</span>
               <input
                 value={newProjectName}
                 onChange={(event) => setNewProjectName(event.target.value)}
-                placeholder="새 프로젝트 이름"
+                placeholder="비우면 고객사와 분류로 자동 생성"
                 className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
               />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-xs font-medium text-muted-foreground">고객사</span>
+              <input
+                value={newProjectClientName}
+                onChange={(event) => setNewProjectClientName(event.target.value)}
+                placeholder="고객사명"
+                className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-xs font-medium text-muted-foreground">업무 분류</span>
+              <select
+                value={newProjectCategory}
+                onChange={(event) => {
+                  const category = event.target.value as ProjectCategory;
+                  setNewProjectCategory(category);
+                  setNewProjectColor(getProjectCategoryColor(category));
+                }}
+                className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+              >
+                {projectCategoryOptions.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-medium text-muted-foreground">마감일</span>
@@ -119,7 +161,7 @@ export function ProjectsPage() {
                 className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
               />
             </label>
-            <Button type="submit" className="rounded-full" disabled={!newProjectName.trim()}>
+            <Button type="submit" className="rounded-full">
               프로젝트 추가
             </Button>
           </div>
@@ -177,6 +219,9 @@ export function ProjectsPage() {
                   <Badge variant="outline" className="rounded-full border-0 bg-muted/70 capitalize">
                     {project.status === "active" ? "진행 중" : "계획 중"}
                   </Badge>
+                  <Badge variant="outline" className="rounded-full border-0 bg-secondary/70">
+                    {getProjectCategoryLabel(project.category)}
+                  </Badge>
                   <Button
                     type="button"
                     variant="ghost"
@@ -195,6 +240,9 @@ export function ProjectsPage() {
                   <span className="size-2.5 rounded-full" style={{ backgroundColor: project.color }} />
                   <h2 className="truncate text-xl font-semibold tracking-tight">{project.name}</h2>
                 </div>
+                <p className="mt-2 text-xs font-medium text-muted-foreground">
+                  고객사 {project.clientName ?? defaultClientName}
+                </p>
                 <p className="mt-3 min-h-12 text-sm leading-6 text-muted-foreground">{project.description}</p>
               </div>
 

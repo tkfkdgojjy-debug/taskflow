@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { defaultClientName, getProjectCategoryLabel } from "@/constants/project-categories";
 import { DashboardCharts } from "@/features/dashboard/dashboard-charts";
 import { useTaskStore } from "@/store/task-store";
 import type { Project, Task } from "@/types";
@@ -42,6 +43,12 @@ function getTaskDate(task: Task) {
 
 function getTaskProject(task: Task, projects: Project[]) {
   return projects.find((project) => project.id === task.projectId);
+}
+
+function getProjectDisplay(project?: Project) {
+  if (!project) return "프로젝트 없음";
+
+  return `${project.clientName ?? defaultClientName} · ${getProjectCategoryLabel(project.category)}`;
 }
 
 function getProjectProgress(projectId: string, tasks: Task[]) {
@@ -191,7 +198,7 @@ export default function DashboardPage() {
                     <p className="mt-3 line-clamp-2 text-sm font-semibold">{task.title}</p>
                     <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
-                      {project?.name ?? "프로젝트 없음"}
+                      {getProjectDisplay(project)}
                     </div>
                   </div>
                 );
@@ -225,7 +232,7 @@ export default function DashboardPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="line-clamp-2 text-sm font-semibold">{task.title}</p>
-                        <p className="mt-2 text-xs text-muted-foreground">{project?.name ?? "프로젝트 없음"}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">{getProjectDisplay(project)}</p>
                       </div>
                       <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                         {formatDate(task.dueDate)}
@@ -266,6 +273,9 @@ export default function DashboardPage() {
                         <span className="size-2.5 rounded-full" style={{ backgroundColor: project.color }} />
                         <h3 className="font-semibold">{project.name}</h3>
                       </div>
+                      <p className="mt-1 text-xs font-medium text-muted-foreground">
+                        {project.clientName ?? defaultClientName} · {getProjectCategoryLabel(project.category)}
+                      </p>
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
                         {project.description}
                       </p>

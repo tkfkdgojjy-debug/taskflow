@@ -4,9 +4,10 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { defaultClientName, getProjectCategoryLabel } from "@/constants/project-categories";
 import { cn } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
-import type { Task } from "@/types";
+import type { Project, Task } from "@/types";
 
 const weekDays = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -34,6 +35,12 @@ function formatDate(value: Date) {
     month: "long",
     day: "numeric",
   }).format(value);
+}
+
+function getProjectDisplay(project?: Project) {
+  if (!project) return "프로젝트 없음";
+
+  return `${project.clientName ?? defaultClientName} · ${getProjectCategoryLabel(project.category)}`;
 }
 
 function buildMonthDays(monthDate: Date) {
@@ -192,7 +199,7 @@ export function CalendarPageClient() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="line-clamp-2 text-sm font-medium">{task.title}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{project?.name ?? "프로젝트 없음"}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{getProjectDisplay(project)}</p>
                         </div>
                         <Badge variant="outline" className="rounded-full border-0 bg-muted/70 capitalize">
                           {task.priority === "urgent" ? "긴급" : task.priority === "high" ? "높음" : task.priority === "medium" ? "보통" : "낮음"}

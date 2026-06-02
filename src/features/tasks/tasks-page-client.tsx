@@ -28,10 +28,27 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  defaultClientName,
+  getProjectCategoryColor,
+  getProjectCategoryDescription,
+  getProjectCategoryLabel,
+  projectCategoryOptions,
+} from "@/constants/project-categories";
 import { TaskDetailPanel } from "@/features/tasks/task-detail-panel";
 import { cn } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
-import type { Activity, BoardColumn, Project, Task, TaskLabel, TaskPriority, TaskStatus, User } from "@/types";
+import type {
+  Activity,
+  BoardColumn,
+  Project,
+  ProjectCategory,
+  Task,
+  TaskLabel,
+  TaskPriority,
+  TaskStatus,
+  User,
+} from "@/types";
 
 type TaskView = "table" | "kanban";
 type VisibleStatus = Extract<TaskStatus, "todo" | "in_progress" | "review" | "done">;
@@ -78,10 +95,17 @@ function formatDate(value?: string) {
   }).format(new Date(value));
 }
 
+function getProjectDisplay(project?: Project) {
+  if (!project) return "프로젝트 없음";
+
+  return `${project.clientName ?? defaultClientName} · ${getProjectCategoryLabel(project.category)}`;
+}
+
 export function TasksPageClient({ activities, labels, users }: TasksPageClientProps) {
   const taskItems = useTaskStore((state) => state.tasks);
   const projects = useTaskStore((state) => state.projects);
   const columns = useTaskStore((state) => state.columns);
+  const createProject = useTaskStore((state) => state.createProject);
   const createTask = useTaskStore((state) => state.createTask);
   const deleteTask = useTaskStore((state) => state.deleteTask);
   const updateTask = useTaskStore((state) => state.updateTask);
@@ -96,7 +120,8 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
-  const [newTaskProjectId, setNewTaskProjectId] = useState("");
+  const [newTaskClientName, setNewTaskClientName] = useState(defaultClientName);
+  const [newTaskProjectCategory, setNewTaskProjectCategory] = useState<ProjectCategory>("fixed");
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>("medium");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const sensors = useSensors(
@@ -123,8 +148,9 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
           .map((label) => label.name)
           .join(" ");
         const haystack = `${task.title} ${task.description ?? ""} ${project?.name ?? ""} ${taskLabels}`;
+        const projectMeta = `${project?.clientName ?? ""} ${getProjectCategoryLabel(project?.category)}`;
 
-        return haystack.toLowerCase().includes(normalizedQuery);
+        return `${haystack} ${projectMeta}`.toLowerCase().includes(normalizedQuery);
       })
       .sort((a, b) => {
         if (a.status !== b.status) {
@@ -144,7 +170,6 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
   const selectedTask = taskItems.find((task) => task.id === selectedTaskId);
   const activeTask = taskItems.find((task) => task.id === activeTaskId);
   const selectedProject = selectedTask ? getProject(selectedTask) : undefined;
-  const createProjectId = newTaskProjectId || projects[0]?.id || "";
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -173,12 +198,29 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
 
   function handleCreateTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!newTaskTitle.trim() || !createProjectId) return;
+    if (!newTaskTitle.trim()) return;
+
+    const clientName = newTaskClientName.trim() || defaultClientName;
+    const existingProject = projects.find(
+      (project) =>
+        (project.clientName ?? defaultClientName).trim().toLowerCase() === clientName.toLowerCase() &&
+        (project.category ?? "other") === newTaskProjectCategory,
+    );
+    const targetProject =
+      existingProject ??
+      createProject({
+        name: `${clientName} · ${getProjectCategoryLabel(newTaskProjectCategory)}`,
+        description: `${clientName} ${getProjectCategoryDescription(newTaskProjectCategory)}`,
+        category: newTaskProjectCategory,
+        clientName,
+        color: getProjectCategoryColor(newTaskProjectCategory),
+        status: "active",
+      });
 
     const task = createTask({
       title: newTaskTitle.trim(),
       description: newTaskDescription.trim() || undefined,
-      projectId: createProjectId,
+      projectId: targetProject.id,
       createdBy: users[0]?.id ?? "user-1",
       priority: newTaskPriority,
       dueDate: newTaskDueDate ? `${newTaskDueDate}T09:00:00.000Z` : undefined,
@@ -188,7 +230,7 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
     setNewTaskDescription("");
     setNewTaskDueDate("");
     setNewTaskPriority("medium");
-    setNewTaskProjectId(createProjectId);
+    setNewTaskClientName(clientName);
     setIsCreateOpen(false);
     setSelectedTaskId(task.id);
   }
@@ -278,7 +320,7 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
 
         {isCreateOpen ? (
           <form className="rounded-2xl bg-card/86 p-5 shadow-xs backdrop-blur" onSubmit={handleCreateTask}>
-            <div className="grid gap-3 lg:grid-cols-[1fr_180px_140px_150px_auto] lg:items-end">
+            <div className="grid gap-3 lg:grid-cols-[1fr_160px_150px_140px_150px_auto] lg:items-end">
               <label className="block">
                 <span className="mb-2 block text-xs font-medium text-muted-foreground">작업 제목</span>
                 <input
@@ -289,15 +331,24 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-xs font-medium text-muted-foreground">프로젝트</span>
+                <span className="mb-2 block text-xs font-medium text-muted-foreground">고객사</span>
+                <input
+                  value={newTaskClientName}
+                  onChange={(event) => setNewTaskClientName(event.target.value)}
+                  placeholder="고객사명"
+                  className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium text-muted-foreground">업무 분류</span>
                 <select
-                  value={createProjectId}
-                  onChange={(event) => setNewTaskProjectId(event.target.value)}
+                  value={newTaskProjectCategory}
+                  onChange={(event) => setNewTaskProjectCategory(event.target.value as ProjectCategory)}
                   className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
                 >
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
+                  {projectCategoryOptions.map((category) => (
+                    <option key={category.value} value={category.value}>
+                      {category.label}
                     </option>
                   ))}
                 </select>
@@ -324,7 +375,7 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
                   className="h-11 w-full rounded-full bg-background/70 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
                 />
               </label>
-              <Button type="submit" className="rounded-full" disabled={!newTaskTitle.trim() || !createProjectId}>
+              <Button type="submit" className="rounded-full" disabled={!newTaskTitle.trim()}>
                 추가
               </Button>
             </div>
@@ -334,9 +385,9 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
               placeholder="설명을 추가하세요"
               className="mt-3 min-h-20 w-full resize-none rounded-2xl bg-background/70 px-4 py-3 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
             />
-            {projects.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">작업을 추가하려면 먼저 프로젝트를 만들어주세요.</p>
-            ) : null}
+            <p className="mt-3 text-sm text-muted-foreground">
+              같은 고객사와 분류의 프로젝트가 없으면 자동으로 생성됩니다.
+            </p>
           </form>
         ) : null}
 
@@ -395,7 +446,7 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
                   <option value="all">전체 프로젝트</option>
                   {projects.map((project) => (
                     <option key={project.id} value={project.id}>
-                      {project.name}
+                      {getProjectDisplay(project)}
                     </option>
                   ))}
                 </select>
@@ -514,7 +565,7 @@ function TableView({
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
-                      {project?.name ?? "프로젝트 없음"}
+                      {getProjectDisplay(project)}
                     </span>
                     {taskLabels.slice(0, 1).map((label) => (
                       <span key={label.id} className="rounded-full bg-muted/70 px-2 py-0.5">
@@ -733,7 +784,7 @@ function KanbanTaskCard({
           <p className="line-clamp-2 text-[13px] font-semibold leading-5 tracking-tight">{task.title}</p>
           <div className="mt-2.5 flex items-center gap-2 text-xs text-muted-foreground">
             <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
-            <span className="truncate">{project?.name ?? "프로젝트 없음"}</span>
+            <span className="truncate">{getProjectDisplay(project)}</span>
           </div>
         </div>
       </div>

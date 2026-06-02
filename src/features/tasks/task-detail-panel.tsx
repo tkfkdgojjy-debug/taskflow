@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { defaultClientName, getProjectCategoryLabel } from "@/constants/project-categories";
 import { appTransition, softSpring } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { Activity, Project, Task, TaskPriority, TaskStatus, User } from "@/types";
@@ -131,6 +132,12 @@ function getInitials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function getProjectDisplay(project?: Project) {
+  if (!project) return "프로젝트 없음";
+
+  return `${project.clientName ?? defaultClientName} · ${getProjectCategoryLabel(project.category)}`;
 }
 
 export function TaskDetailPanel({
@@ -269,7 +276,7 @@ export function TaskDetailPanel({
             <header className="flex h-16 shrink-0 items-center justify-between px-8">
               <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
                 <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
-                <span className="truncate">{project?.name ?? "프로젝트 없음"}</span>
+                <span className="truncate">{getProjectDisplay(project)}</span>
               </div>
               <div className="flex items-center gap-1">
                 <Button

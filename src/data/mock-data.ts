@@ -9,6 +9,7 @@ import type {
   User,
   Workspace,
 } from "@/types";
+import { projectCategoryOptions } from "@/constants/project-categories";
 
 export const mockUsers: User[] = [
   {
@@ -42,30 +43,19 @@ export const mockWorkspaces: Workspace[] = [
   },
 ];
 
-export const mockProjects: Project[] = [
-  {
-    id: "project-1",
-    workspaceId: "workspace-1",
-    name: "제품 출시 준비",
-    description: "작업 관리 제품의 첫 출시를 위한 핵심 준비 계획입니다.",
-    status: "active",
-    color: "#A9B9C9",
-    dueDate: "2026-06-30T09:00:00.000Z",
-    createdAt: "2026-05-01T09:00:00.000Z",
-    updatedAt: "2026-05-20T09:00:00.000Z",
-  },
-  {
-    id: "project-2",
-    workspaceId: "workspace-1",
-    name: "고객 온보딩",
-    description: "신규 고객 지원과 온보딩 흐름을 정리하는 프로젝트입니다.",
-    status: "planning",
-    color: "#A8BBA3",
-    dueDate: "2026-07-15T09:00:00.000Z",
-    createdAt: "2026-05-08T09:00:00.000Z",
-    updatedAt: "2026-05-21T09:00:00.000Z",
-  },
-];
+export const mockProjects: Project[] = projectCategoryOptions.map((category, index) => ({
+  id: `project-${index + 1}`,
+  workspaceId: "workspace-1",
+  name: category.label,
+  description: category.description,
+  category: category.value,
+  clientName: "내부",
+  status: index === 0 ? "active" : "planning",
+  color: category.color,
+  dueDate: "2026-06-30T09:00:00.000Z",
+  createdAt: "2026-05-01T09:00:00.000Z",
+  updatedAt: "2026-05-20T09:00:00.000Z",
+}));
 
 export const mockColumns: BoardColumn[] = [
   { id: "column-backlog", projectId: "project-1", title: "백로그", status: "backlog", order: 0 },
