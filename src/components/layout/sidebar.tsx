@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   BarChart3,
@@ -10,6 +12,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useTaskStore } from "@/store/task-store";
 
 const navigationItems = [
   { label: "대시보드", href: "/", icon: Gauge },
@@ -27,6 +30,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activePath = "/", onNavigate }: SidebarProps) {
+  const taskCount = useTaskStore((state) => state.tasks.length);
+
   return (
     <aside className="flex h-full w-[280px] flex-col rounded-2xl bg-sidebar/88 text-sidebar-foreground shadow-sm backdrop-blur-xl">
       <div className="flex h-[72px] items-center gap-3 px-4">
@@ -65,9 +70,9 @@ export function Sidebar({ activePath = "/", onNavigate }: SidebarProps) {
                 <Icon className="size-4" />
               </span>
               <span className="flex-1">{item.label}</span>
-              {item.label === "작업" ? (
+              {item.href === "/tasks" ? (
                 <Badge className="h-5 border-0 bg-terracotta/18 px-1.5 text-[11px] text-sidebar-foreground/70">
-                  12
+                  {taskCount}
                 </Badge>
               ) : null}
             </Link>

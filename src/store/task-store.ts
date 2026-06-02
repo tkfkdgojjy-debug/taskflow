@@ -36,6 +36,7 @@ interface TaskState {
   resetFilters: () => void;
   clearTasks: () => void;
   createTask: (input: CreateTaskInput) => Task;
+  deleteProject: (projectId: ID) => void;
   updateTask: (taskId: ID, patch: Partial<Task>) => void;
   deleteTask: (taskId: ID) => void;
   moveTask: (input: MoveTaskInput) => void;
@@ -122,6 +123,20 @@ export const useTaskStore = create<TaskState>()(
           set((state) => ({ tasks: [...state.tasks, task] }));
           return task;
         },
+        deleteProject: (projectId) =>
+          set((state) => {
+            const nextProjects = state.projects.filter((project) => project.id !== projectId);
+            const nextSelectedProjectId =
+              state.selectedProjectId === projectId
+                ? nextProjects[0]?.id ?? ""
+                : state.selectedProjectId;
+
+            return {
+              projects: nextProjects,
+              selectedProjectId: nextSelectedProjectId,
+              tasks: state.tasks.filter((task) => task.projectId !== projectId),
+            };
+          }),
         updateTask: (taskId, patch) =>
           set((state) => ({
             tasks: state.tasks.map((task) => {
@@ -179,6 +194,7 @@ export const useTaskStore = create<TaskState>()(
         name: "task-management-store-ko",
         storage: createJSONStorage(() => localStorage),
         partialize: (state) => ({
+          projects: state.projects,
           tasks: state.tasks,
           selectedWorkspaceId: state.selectedWorkspaceId,
           selectedProjectId: state.selectedProjectId,

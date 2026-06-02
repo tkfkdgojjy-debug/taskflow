@@ -1,12 +1,12 @@
-import { CalendarClock, FolderKanban } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { CalendarClock, FolderKanban, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Project, Task } from "@/types";
-
-interface ProjectsPageProps {
-  projects: Project[];
-  tasks: Task[];
-}
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useTaskStore } from "@/store/task-store";
+import type { Task } from "@/types";
 
 function formatDate(value?: string) {
   if (!value) return "날짜 없음";
@@ -32,8 +32,19 @@ function getProjectStats(projectId: string, tasks: Task[]) {
   };
 }
 
-export function ProjectsPage({ projects, tasks }: ProjectsPageProps) {
+export function ProjectsPage() {
+  const projects = useTaskStore((state) => state.projects);
+  const tasks = useTaskStore((state) => state.tasks);
+  const deleteProject = useTaskStore((state) => state.deleteProject);
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const totalTasks = tasks.length;
+  const projectToDelete = projects.find((project) => project.id === deleteProjectId);
+
+  function confirmDeleteProject() {
+    if (!deleteProjectId) return;
+    deleteProject(deleteProjectId);
+    setDeleteProjectId(null);
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -79,9 +90,21 @@ export function ProjectsPage({ projects, tasks }: ProjectsPageProps) {
                 <div className="grid size-12 place-items-center rounded-2xl bg-warm-beige/28 text-muted-foreground">
                   <FolderKanban className="size-5" />
                 </div>
-                <Badge variant="outline" className="rounded-full border-0 bg-muted/70 capitalize">
-                  {project.status === "active" ? "진행 중" : "계획 중"}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="rounded-full border-0 bg-muted/70 capitalize">
+                    {project.status === "active" ? "진행 중" : "계획 중"}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 text-destructive hover:bg-destructive/10"
+                    aria-label={`${project.name} 삭제`}
+                    onClick={() => setDeleteProjectId(project.id)}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
               </div>
 
               <div className="mt-7">
@@ -116,6 +139,17 @@ export function ProjectsPage({ projects, tasks }: ProjectsPageProps) {
           );
         })}
       </section>
+
+      <ConfirmDialog
+        confirmLabel="삭제"
+        description={`${
+          projectToDelete?.name ?? "선택한 프로젝트"
+        }와 연결된 작업이 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`}
+        isOpen={Boolean(deleteProjectId)}
+        onClose={() => setDeleteProjectId(null)}
+        onConfirm={confirmDeleteProject}
+        title="프로젝트를 삭제할까요?"
+      />
     </div>
   );
 }
