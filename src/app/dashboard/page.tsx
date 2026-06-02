@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo } from "react";
 import {
   CalendarClock,
   CheckCircle2,
@@ -9,37 +12,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardCharts } from "@/features/dashboard/dashboard-charts";
-import { mockBurndownData, mockProjects, mockTasks } from "@/data/mock-data";
-import type { Task } from "@/types";
+import { useTaskStore } from "@/store/task-store";
+import type { Project, Task } from "@/types";
 
-const weeklyProductivity = [
-  { day: "월", completed: 3, focus: 5 },
-  { day: "화", completed: 5, focus: 6 },
-  { day: "수", completed: 4, focus: 6 },
-  { day: "목", completed: 7, focus: 7 },
-  { day: "금", completed: 6, focus: 8 },
-  { day: "토", completed: 2, focus: 4 },
-  { day: "일", completed: 1, focus: 3 },
-];
-
-const monthlyCompletion = mockBurndownData.map((point, index) => ({
-  week: `${index + 1}주`,
-  completed: point.completed + index * 2,
-  remaining: point.remaining,
-}));
-
-const todayTasks = mockTasks
-  .filter((task) => task.status !== "done")
-  .slice(0, 3)
-  .map((task, index) => ({
-    ...task,
-    time: ["09:30", "13:00", "16:30"][index],
-  }));
-
-const upcomingTasks = [...mockTasks]
-  .filter((task) => task.dueDate && task.status !== "done")
-  .sort((a, b) => new Date(a.dueDate ?? "").getTime() - new Date(b.dueDate ?? "").getTime())
-  .slice(0, 4);
+const dayLabels = ["월", "화", "수", "목", "금", "토", "일"];
 
 function formatDate(value?: string) {
   if (!value) return "날짜 없음";
@@ -50,12 +26,25 @@ function formatDate(value?: string) {
   }).format(new Date(value));
 }
 
-function getTaskProject(task: Task) {
-  return mockProjects.find((project) => project.id === task.projectId);
+function getStartOfWeek(date: Date) {
+  const start = new Date(date);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
 }
 
-function getProjectProgress(projectId: string) {
-  const projectTasks = mockTasks.filter((task) => task.projectId === projectId);
+function getTaskDate(task: Task) {
+  return new Date(task.completedAt ?? task.dueDate ?? task.updatedAt ?? task.createdAt);
+}
+
+function getTaskProject(task: Task, projects: Project[]) {
+  return projects.find((project) => project.id === task.projectId);
+}
+
+function getProjectProgress(projectId: string, tasks: Task[]) {
+  const projectTasks = tasks.filter((task) => task.projectId === projectId);
   if (projectTasks.length === 0) return 0;
 
   const completed = projectTasks.filter((task) => task.status === "done").length;
@@ -63,10 +52,81 @@ function getProjectProgress(projectId: string) {
 }
 
 export default function DashboardPage() {
-  const focusTask = todayTasks[0];
-  const completedTasks = mockTasks.filter((task) => task.status === "done").length;
-  const activeTasks = mockTasks.filter((task) => task.status !== "done").length;
-  const completionRate = mockTasks.length ? Math.round((completedTasks / mockTasks.length) * 100) : 0;
+  const tasks = useTaskStore((state) => state.tasks);
+  const projects = useTaskStore((state) => state.projects);
+
+  const {
+    activeTasks,
+    completedTasks,
+    completionRate,
+    focusTask,
+    monthlyCompletion,
+    todayTasks,
+    upcomingTasks,
+    weeklyProductivity,
+  } = useMemo(() => {
+    const incompleteTasks = tasks.filter((task) => task.status !== "done");
+    const doneTasks = tasks.filter((task) => task.status === "done");
+    const sortedIncompleteTasks = [...incompleteTasks].sort((a, b) => {
+      const left = new Date(a.dueDate ?? a.updatedAt).getTime();
+      const right = new Date(b.dueDate ?? b.updatedAt).getTime();
+      return left - right;
+    });
+
+    const weekStart = getStartOfWeek(new Date());
+    const weekDays = dayLabels.map((day, index) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + index);
+      return { day, date };
+    });
+
+    const weekly = weekDays.map(({ day, date }) => {
+      const dayKey = date.toDateString();
+      const completed = doneTasks.filter((task) => getTaskDate(task).toDateString() === dayKey).length;
+      const planned = tasks.filter((task) => {
+        if (!task.dueDate) return false;
+        return new Date(task.dueDate).toDateString() === dayKey;
+      }).length;
+
+      return {
+        day,
+        completed,
+        focus: Math.max(planned, completed),
+      };
+    });
+
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth();
+    const monthly = Array.from({ length: 5 }, (_, index) => {
+      const weekTasks = tasks.filter((task) => {
+        const taskDate = getTaskDate(task);
+        if (taskDate.getFullYear() !== currentYear || taskDate.getMonth() !== currentMonth) return false;
+        return Math.floor((taskDate.getDate() - 1) / 7) === index;
+      });
+
+      return {
+        week: `${index + 1}주`,
+        completed: weekTasks.filter((task) => task.status === "done").length,
+        remaining: weekTasks.filter((task) => task.status !== "done").length,
+      };
+    });
+
+    return {
+      activeTasks: incompleteTasks.length,
+      completedTasks: doneTasks.length,
+      completionRate: tasks.length ? Math.round((doneTasks.length / tasks.length) * 100) : 0,
+      focusTask: sortedIncompleteTasks[0],
+      monthlyCompletion: monthly,
+      todayTasks: sortedIncompleteTasks.slice(0, 3).map((task, index) => ({
+        ...task,
+        time: ["09:30", "13:00", "16:30"][index] ?? "오늘",
+      })),
+      upcomingTasks: sortedIncompleteTasks
+        .filter((task) => task.dueDate)
+        .slice(0, 4),
+      weeklyProductivity: weekly,
+    };
+  }, [tasks]);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -77,10 +137,10 @@ export default function DashboardPage() {
               데일리 워크스페이스
             </Badge>
             <h1 className="text-3xl font-semibold tracking-tight md:text-5xl">
-              오늘 할 일이 선명하면 하루가 가벼워집니다.
+              오늘의 일이 선명해지면 하루가 가벼워집니다.
             </h1>
             <p className="mt-4 text-base leading-7 text-muted-foreground">
-              지금 집중할 일, 곧 다가올 일정, 프로젝트의 흐름을 차분하게 확인하세요.
+              작업, 프로젝트, 일정의 최신 상태를 한 곳에서 차분하게 확인하세요.
             </p>
           </div>
           <Button variant="outline" className="w-fit rounded-full">
@@ -96,11 +156,11 @@ export default function DashboardPage() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">오늘의 집중</p>
               <h2 className="mt-3 max-w-2xl text-2xl font-semibold tracking-tight md:text-3xl">
-                {focusTask?.title ?? "중요한 작업 하나를 선택하세요"}
+                {focusTask?.title ?? "오늘 집중할 작업을 추가해보세요"}
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
                 {focusTask?.description ??
-                  "의미 있는 작업 하나를 정하고 나머지 하루를 단순하게 유지하세요."}
+                  "Tasks에서 작업을 추가하면 대시보드와 캘린더에 자동으로 반영됩니다."}
               </p>
             </div>
             <div className="grid size-24 shrink-0 place-items-center rounded-full bg-muted/50">
@@ -111,23 +171,29 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-8 grid gap-3 md:grid-cols-3">
-            {todayTasks.map((task) => {
-              const project = getTaskProject(task);
+            {todayTasks.length > 0 ? (
+              todayTasks.map((task) => {
+                const project = getTaskProject(task, projects);
 
-              return (
-                <div key={task.id} className="rounded-2xl bg-background/70 p-4">
-                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                    <Clock3 className="size-3.5" />
-                    {task.time}
+                return (
+                  <div key={task.id} className="rounded-2xl bg-background/70 p-4">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <Clock3 className="size-3.5" />
+                      {task.time}
+                    </div>
+                    <p className="mt-3 line-clamp-2 text-sm font-semibold">{task.title}</p>
+                    <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
+                      {project?.name ?? "프로젝트 없음"}
+                    </div>
                   </div>
-                  <p className="mt-3 line-clamp-2 text-sm font-semibold">{task.title}</p>
-                  <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
-                    {project?.name ?? "프로젝트 없음"}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="rounded-2xl bg-background/70 p-5 text-sm text-muted-foreground md:col-span-3">
+                아직 진행 중인 작업이 없습니다.
+              </div>
+            )}
           </div>
         </article>
 
@@ -143,23 +209,29 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-6 space-y-3">
-            {upcomingTasks.map((task) => {
-              const project = getTaskProject(task);
+            {upcomingTasks.length > 0 ? (
+              upcomingTasks.map((task) => {
+                const project = getTaskProject(task, projects);
 
-              return (
-                <div key={task.id} className="rounded-2xl bg-background/70 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="line-clamp-2 text-sm font-semibold">{task.title}</p>
-                      <p className="mt-2 text-xs text-muted-foreground">{project?.name}</p>
+                return (
+                  <div key={task.id} className="rounded-2xl bg-background/70 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-sm font-semibold">{task.title}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">{project?.name ?? "프로젝트 없음"}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                        {formatDate(task.dueDate)}
+                      </span>
                     </div>
-                    <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                      {formatDate(task.dueDate)}
-                    </span>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="rounded-2xl bg-background/70 p-5 text-sm text-muted-foreground">
+                예정된 마감 작업이 없습니다.
+              </div>
+            )}
           </div>
         </aside>
       </section>
@@ -174,42 +246,48 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {mockProjects.map((project) => {
-            const progress = getProjectProgress(project.id);
-            const projectTasks = mockTasks.filter((task) => task.projectId === project.id);
+          {projects.length > 0 ? (
+            projects.map((project) => {
+              const progress = getProjectProgress(project.id, tasks);
+              const projectTasks = tasks.filter((task) => task.projectId === project.id);
 
-            return (
-              <article key={project.id} className="rounded-2xl bg-background/70 p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="size-2.5 rounded-full" style={{ backgroundColor: project.color }} />
-                      <h3 className="font-semibold">{project.name}</h3>
+              return (
+                <article key={project.id} className="rounded-2xl bg-background/70 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="size-2.5 rounded-full" style={{ backgroundColor: project.color }} />
+                        <h3 className="font-semibold">{project.name}</h3>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                        {project.description}
+                      </p>
                     </div>
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                      {project.description}
-                    </p>
+                    <Badge variant="outline" className="rounded-full border-0 bg-muted/70 capitalize">
+                      {project.status === "active" ? "진행 중" : "계획 중"}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="rounded-full border-0 bg-muted/70 capitalize">
-                    {project.status === "active" ? "진행 중" : "계획 중"}
-                  </Badge>
-                </div>
-                <div className="mt-6">
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">작업 {projectTasks.length}개</span>
-                    <span className="font-medium">{progress}%</span>
+                  <div className="mt-6">
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">작업 {projectTasks.length}개</span>
+                      <span className="font-medium">{progress}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-olive/85" style={{ width: `${progress}%` }} />
+                    </div>
+                    <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                      <CalendarClock className="size-3.5" />
+                      마감 {formatDate(project.dueDate)}
+                    </div>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-olive/85" style={{ width: `${progress}%` }} />
-                  </div>
-                  <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                    <CalendarClock className="size-3.5" />
-                    마감 {formatDate(project.dueDate)}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+                </article>
+              );
+            })
+          ) : (
+            <div className="rounded-2xl bg-background/70 p-6 text-sm text-muted-foreground md:col-span-2">
+              아직 프로젝트가 없습니다. Projects에서 새 프로젝트를 만들면 여기에 표시됩니다.
+            </div>
+          )}
         </div>
       </section>
 
