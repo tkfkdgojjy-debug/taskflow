@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   CalendarClock,
   CheckCircle2,
@@ -52,6 +53,7 @@ function getProjectProgress(projectId: string, tasks: Task[]) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const tasks = useTaskStore((state) => state.tasks);
   const projects = useTaskStore((state) => state.projects);
 
@@ -143,7 +145,12 @@ export default function DashboardPage() {
               작업, 프로젝트, 일정의 최신 상태를 한 곳에서 차분하게 확인하세요.
             </p>
           </div>
-          <Button variant="outline" className="w-fit rounded-full">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-fit rounded-full"
+            onClick={() => router.push("/tasks?create=today")}
+          >
             <Sparkles />
             오늘 계획하기
           </Button>

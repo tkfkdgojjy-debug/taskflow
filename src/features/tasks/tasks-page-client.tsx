@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   closestCorners,
   DndContext,
@@ -62,6 +62,12 @@ const priorityLabels: Record<TaskPriority, string> = {
   high: "높음",
   urgent: "긴급",
 };
+
+function getTodayInputValue() {
+  const today = new Date();
+  const timezoneOffset = today.getTimezoneOffset() * 60_000;
+  return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10);
+}
 
 function formatDate(value?: string) {
   if (!value) return "날짜 없음";
@@ -139,6 +145,19 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
   const activeTask = taskItems.find((task) => task.id === activeTaskId);
   const selectedProject = selectedTask ? getProject(selectedTask) : undefined;
   const createProjectId = newTaskProjectId || projects[0]?.id || "";
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "today") return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      setIsCreateOpen(true);
+      setNewTaskDueDate((current) => current || getTodayInputValue());
+    });
+    window.history.replaceState(null, "", window.location.pathname);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
 
   function getProject(task: Task) {
     return projects.find((project) => project.id === task.projectId);
