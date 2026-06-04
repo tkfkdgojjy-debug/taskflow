@@ -40,6 +40,7 @@ export function DbSyncProvider({ children }: DbSyncProviderProps) {
         const payload = (await response.json()) as AppStateResponse;
 
         if (!isMounted || !payload.configured) {
+          useTaskStore.getState().generateRecurringTasksForMonth();
           isReady = true;
           return;
         }
@@ -49,8 +50,14 @@ export function DbSyncProvider({ children }: DbSyncProviderProps) {
         if (payload.data) {
           isApplyingRemoteSnapshot = true;
           useTaskStore.getState().hydrateFromSnapshot(payload.data);
+          const generatedTasks = useTaskStore.getState().generateRecurringTasksForMonth();
           isApplyingRemoteSnapshot = false;
+
+          if (generatedTasks.length > 0) {
+            await saveSnapshot(getTaskStoreSnapshot(useTaskStore.getState()));
+          }
         } else {
+          useTaskStore.getState().generateRecurringTasksForMonth();
           await saveSnapshot(getTaskStoreSnapshot(useTaskStore.getState()));
         }
 

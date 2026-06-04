@@ -49,6 +49,20 @@ export interface GoalItem {
   updatedAt: ISODateString;
 }
 
+export interface RecurringTaskTemplate {
+  id: ID;
+  workspaceId: ID;
+  clientName: string;
+  category: Extract<ProjectCategory, "fixed">;
+  title: string;
+  description?: string;
+  dayOfMonth: number;
+  priority: TaskPriority;
+  enabled: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
 export interface BoardColumn {
   id: ID;
   projectId: ID;
@@ -99,6 +113,8 @@ export interface Task {
   createdAt: ISODateString;
   updatedAt: ISODateString;
   completedAt?: ISODateString;
+  recurrenceTemplateId?: ID;
+  recurrenceMonth?: string;
 }
 
 export interface Activity {

@@ -1,26 +1,45 @@
 "use client";
 
-import { useState } from "react";
-import { Bell, Database, Moon, ShieldCheck, Sun, Trash2, UserRound } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { Bell, Database, Moon, Plus, Repeat2, ShieldCheck, Sun, Trash2, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
+import { defaultClientName } from "@/constants/project-categories";
 import { cn } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
 import { useUIStore } from "@/store/ui-store";
+import type { TaskPriority } from "@/types";
+
+const priorityLabels: Record<TaskPriority, string> = {
+  low: "낮음",
+  medium: "보통",
+  high: "높음",
+  urgent: "긴급",
+};
 
 export function SettingsPageClient() {
   const { toast } = useToast();
   const themeMode = useUIStore((state) => state.themeMode);
   const setThemeMode = useUIStore((state) => state.setThemeMode);
   const clearTasks = useTaskStore((state) => state.clearTasks);
+  const createRecurringTemplate = useTaskStore((state) => state.createRecurringTemplate);
+  const deleteRecurringTemplate = useTaskStore((state) => state.deleteRecurringTemplate);
+  const generateRecurringTasksForMonth = useTaskStore((state) => state.generateRecurringTasksForMonth);
+  const recurringTemplates = useTaskStore((state) => state.recurringTemplates);
   const tasks = useTaskStore((state) => state.tasks);
+  const updateRecurringTemplate = useTaskStore((state) => state.updateRecurringTemplate);
   const [isClearTasksConfirmOpen, setIsClearTasksConfirmOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [weeklyDigest, setWeeklyDigest] = useState(true);
+  const [newTemplateClientName, setNewTemplateClientName] = useState(defaultClientName);
+  const [newTemplateDay, setNewTemplateDay] = useState("1");
+  const [newTemplateDescription, setNewTemplateDescription] = useState("");
+  const [newTemplatePriority, setNewTemplatePriority] = useState<TaskPriority>("medium");
+  const [newTemplateTitle, setNewTemplateTitle] = useState("");
 
   function saveSettings() {
     toast({
@@ -47,6 +66,43 @@ export function SettingsPageClient() {
       title: "샘플 작업을 비웠습니다",
       description: "작업 목록의 샘플 데이터가 삭제되었습니다.",
       variant: "success",
+    });
+  }
+
+  function createTemplate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newTemplateTitle.trim()) return;
+
+    createRecurringTemplate({
+      clientName: newTemplateClientName.trim() || defaultClientName,
+      title: newTemplateTitle.trim(),
+      description: newTemplateDescription.trim() || undefined,
+      dayOfMonth: Number(newTemplateDay) || 1,
+      priority: newTemplatePriority,
+    });
+
+    setNewTemplateTitle("");
+    setNewTemplateDescription("");
+    setNewTemplateDay("1");
+    setNewTemplatePriority("medium");
+
+    toast({
+      title: "고정 템플릿이 추가되었습니다",
+      description: "앱을 열 때 이번 달 작업이 자동으로 생성됩니다.",
+      variant: "success",
+    });
+  }
+
+  function generateCurrentMonthTasks() {
+    const generatedTasks = generateRecurringTasksForMonth();
+
+    toast({
+      title: generatedTasks.length > 0 ? "고정 업무가 생성되었습니다" : "생성할 고정 업무가 없습니다",
+      description:
+        generatedTasks.length > 0
+          ? `이번 달 작업 ${generatedTasks.length}개를 추가했습니다.`
+          : "이미 이번 달 고정 업무가 생성되어 있습니다.",
+      variant: generatedTasks.length > 0 ? "success" : "default",
     });
   }
 
@@ -142,6 +198,138 @@ export function SettingsPageClient() {
                 label="주간 요약"
                 onChange={setWeeklyDigest}
               />
+            </div>
+          </section>
+
+          <section className="rounded-lg border bg-card p-5 shadow-xs">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-lg border bg-muted/40 text-muted-foreground">
+                  <Repeat2 className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold">고정 템플릿</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    매달 같은 날짜에 생성할 고정 업무를 관리합니다.
+                  </p>
+                </div>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={generateCurrentMonthTasks}>
+                이번 달 생성
+              </Button>
+            </div>
+
+            <form className="mt-5 rounded-2xl bg-background/70 p-4" onSubmit={createTemplate}>
+              <div className="grid gap-3 lg:grid-cols-[1fr_140px_100px_120px_auto] lg:items-end">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-medium text-muted-foreground">업무 제목</span>
+                  <input
+                    value={newTemplateTitle}
+                    onChange={(event) => setNewTemplateTitle(event.target.value)}
+                    placeholder="예: 월간 리포트 발송"
+                    className="h-10 w-full rounded-full bg-card px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-medium text-muted-foreground">고객사</span>
+                  <input
+                    value={newTemplateClientName}
+                    onChange={(event) => setNewTemplateClientName(event.target.value)}
+                    placeholder="고객사명"
+                    className="h-10 w-full rounded-full bg-card px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-medium text-muted-foreground">매월</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={newTemplateDay}
+                    onChange={(event) => setNewTemplateDay(event.target.value)}
+                    className="h-10 w-full rounded-full bg-card px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-medium text-muted-foreground">우선순위</span>
+                  <select
+                    value={newTemplatePriority}
+                    onChange={(event) => setNewTemplatePriority(event.target.value as TaskPriority)}
+                    className="h-10 w-full rounded-full bg-card px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+                  >
+                    <option value="low">낮음</option>
+                    <option value="medium">보통</option>
+                    <option value="high">높음</option>
+                    <option value="urgent">긴급</option>
+                  </select>
+                </label>
+                <Button type="submit" className="rounded-full" disabled={!newTemplateTitle.trim()}>
+                  <Plus />
+                  추가
+                </Button>
+              </div>
+              <textarea
+                value={newTemplateDescription}
+                onChange={(event) => setNewTemplateDescription(event.target.value)}
+                placeholder="설명"
+                className="mt-3 min-h-16 w-full resize-none rounded-2xl bg-card px-4 py-3 text-sm outline-none focus:shadow-[var(--shadow-focus)]"
+              />
+            </form>
+
+            <div className="mt-5 space-y-2">
+              {recurringTemplates.length > 0 ? (
+                recurringTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="flex flex-col gap-3 rounded-2xl bg-background/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium tracking-tight">{template.title}</p>
+                        <Badge variant="outline" className="rounded-full border-0 bg-muted/70">
+                          매월 {template.dayOfMonth}일
+                        </Badge>
+                        <Badge variant="secondary" className="rounded-full">
+                          {priorityLabels[template.priority]}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {template.clientName} · 고정업무
+                        {template.description ? ` · ${template.description}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        aria-pressed={template.enabled}
+                        className="relative h-6 w-11 rounded-full border bg-muted transition-colors aria-pressed:bg-primary"
+                        onClick={() => updateRecurringTemplate(template.id, { enabled: !template.enabled })}
+                      >
+                        <span
+                          className={cn(
+                            "absolute left-0.5 top-0.5 size-5 rounded-full bg-background shadow-sm transition-transform",
+                            template.enabled && "translate-x-5",
+                          )}
+                        />
+                      </button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 text-destructive hover:bg-destructive/10"
+                        aria-label={`${template.title} 템플릿 삭제`}
+                        onClick={() => deleteRecurringTemplate(template.id)}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="grid min-h-28 place-items-center rounded-2xl bg-background/70 p-5 text-center text-sm text-muted-foreground">
+                  아직 등록된 고정 템플릿이 없습니다.
+                </div>
+              )}
             </div>
           </section>
         </div>

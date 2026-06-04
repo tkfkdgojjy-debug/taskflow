@@ -8,8 +8,10 @@ import type {
   ID,
   Project,
   ProjectCategory,
+  RecurringTaskTemplate,
   Task,
   TaskFilters,
+  TaskPriority,
   TaskStatus,
   Workspace,
 } from "@/types";
@@ -44,6 +46,15 @@ interface CreateGoalInput {
   target: number;
 }
 
+interface CreateRecurringTemplateInput {
+  clientName: string;
+  title: string;
+  description?: string;
+  dayOfMonth: number;
+  priority: TaskPriority;
+  enabled?: boolean;
+}
+
 interface MoveTaskInput {
   taskId: ID;
   targetColumnId: ID;
@@ -54,6 +65,7 @@ export interface TaskStoreSnapshot {
   workspaces: Workspace[];
   projects: Project[];
   goals: GoalItem[];
+  recurringTemplates: RecurringTaskTemplate[];
   columns: BoardColumn[];
   tasks: Task[];
   selectedWorkspaceId: ID;
@@ -64,6 +76,7 @@ interface TaskState {
   workspaces: Workspace[];
   projects: Project[];
   goals: GoalItem[];
+  recurringTemplates: RecurringTaskTemplate[];
   columns: BoardColumn[];
   tasks: Task[];
   selectedWorkspaceId: ID;
@@ -77,9 +90,13 @@ interface TaskState {
   clearTasks: () => void;
   createProject: (input: CreateProjectInput) => Project;
   createGoal: (input: CreateGoalInput) => GoalItem;
+  createRecurringTemplate: (input: CreateRecurringTemplateInput) => RecurringTaskTemplate;
   deleteGoal: (goalId: ID) => void;
+  deleteRecurringTemplate: (templateId: ID) => void;
+  generateRecurringTasksForMonth: (date?: Date) => Task[];
   createTask: (input: CreateTaskInput) => Task;
   deleteProject: (projectId: ID) => void;
+  updateRecurringTemplate: (templateId: ID, patch: Partial<RecurringTaskTemplate>) => void;
   updateGoal: (goalId: ID, patch: Partial<GoalItem>) => void;
   updateTask: (taskId: ID, patch: Partial<Task>) => void;
   deleteTask: (taskId: ID) => void;
@@ -113,6 +130,23 @@ function reorderTasks(tasks: Task[], columnId: ID): Task[] {
   });
 }
 
+function clampDayOfMonth(day: number) {
+  return Math.max(1, Math.min(31, Math.round(day)));
+}
+
+function getMonthKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function getRecurringDueDate(monthKey: string, dayOfMonth: number) {
+  const [yearValue, monthValue] = monthKey.split("-").map(Number);
+  const lastDay = new Date(yearValue, monthValue, 0).getDate();
+  const day = Math.min(clampDayOfMonth(dayOfMonth), lastDay);
+  return `${monthKey}-${String(day).padStart(2, "0")}T09:00:00.000Z`;
+}
+
 function withDefaultProjects(projects: Project[]) {
   const existingProjectIds = new Set(projects.map((project) => project.id));
   const missingDefaultProjects = mockProjects
@@ -138,6 +172,7 @@ export function getTaskStoreSnapshot(state: TaskState): TaskStoreSnapshot {
     workspaces: state.workspaces,
     projects: state.projects,
     goals: state.goals,
+    recurringTemplates: state.recurringTemplates,
     columns: state.columns,
     tasks: state.tasks,
     selectedWorkspaceId: state.selectedWorkspaceId,
@@ -152,6 +187,7 @@ export const useTaskStore = create<TaskState>()(
         workspaces: mockWorkspaces,
         projects: mockProjects,
         goals: mockGoals,
+        recurringTemplates: [],
         columns: mockColumns,
         tasks: mockTasks,
         selectedWorkspaceId: mockWorkspaces[0]?.id ?? "",
@@ -178,6 +214,7 @@ export const useTaskStore = create<TaskState>()(
             workspaces: snapshot.workspaces ?? state.workspaces,
             projects: withDefaultProjects(snapshot.projects ?? state.projects),
             goals: snapshot.goals ?? state.goals,
+            recurringTemplates: snapshot.recurringTemplates ?? state.recurringTemplates,
             columns: snapshot.columns ?? state.columns,
             tasks: snapshot.tasks ?? state.tasks,
             selectedWorkspaceId: snapshot.selectedWorkspaceId ?? state.selectedWorkspaceId,
@@ -200,6 +237,25 @@ export const useTaskStore = create<TaskState>()(
 
           set((state) => ({ goals: [...state.goals, goal] }));
           return goal;
+        },
+        createRecurringTemplate: (input) => {
+          const now = new Date().toISOString();
+          const template: RecurringTaskTemplate = {
+            id: crypto.randomUUID(),
+            workspaceId: get().selectedWorkspaceId,
+            clientName: input.clientName.trim() || defaultClientName,
+            category: "fixed",
+            title: input.title,
+            description: input.description,
+            dayOfMonth: clampDayOfMonth(input.dayOfMonth),
+            priority: input.priority,
+            enabled: input.enabled ?? true,
+            createdAt: now,
+            updatedAt: now,
+          };
+
+          set((state) => ({ recurringTemplates: [...state.recurringTemplates, template] }));
+          return template;
         },
         createProject: (input) => {
           const now = new Date().toISOString();
@@ -227,6 +283,83 @@ export const useTaskStore = create<TaskState>()(
           set((state) => ({
             goals: state.goals.filter((goal) => goal.id !== goalId),
           })),
+        deleteRecurringTemplate: (templateId) =>
+          set((state) => ({
+            recurringTemplates: state.recurringTemplates.filter((template) => template.id !== templateId),
+          })),
+        generateRecurringTasksForMonth: (date = new Date()) => {
+          const monthKey = getMonthKey(date);
+          const now = new Date().toISOString();
+          const generatedTasks: Task[] = [];
+
+          set((state) => {
+            const todoColumnId = columnFromStatus(state.columns, "todo") ?? state.columns[0]?.id ?? "";
+            let projects = [...state.projects];
+            let tasks = [...state.tasks];
+
+            state.recurringTemplates
+              .filter((template) => template.enabled)
+              .forEach((template) => {
+                const hasGeneratedTask = tasks.some(
+                  (task) => task.recurrenceTemplateId === template.id && task.recurrenceMonth === monthKey,
+                );
+                if (hasGeneratedTask) return;
+
+                let project = projects.find(
+                  (item) =>
+                    (item.clientName ?? defaultClientName).trim().toLowerCase() ===
+                      template.clientName.trim().toLowerCase() && item.category === "fixed",
+                );
+
+                if (!project) {
+                  project = {
+                    id: crypto.randomUUID(),
+                    workspaceId: template.workspaceId,
+                    name: `${template.clientName} · 고정업무`,
+                    description: `${template.clientName} 고정업무를 관리하는 프로젝트입니다.`,
+                    category: "fixed",
+                    clientName: template.clientName,
+                    status: "active",
+                    color: getProjectCategoryColor("fixed"),
+                    createdAt: now,
+                    updatedAt: now,
+                  };
+                  projects = [...projects, project];
+                }
+
+                const columnTasks = tasks.filter((task) => task.columnId === todoColumnId);
+                const task: Task = {
+                  id: crypto.randomUUID(),
+                  workspaceId: project.workspaceId,
+                  projectId: project.id,
+                  columnId: todoColumnId,
+                  title: template.title,
+                  description: template.description,
+                  status: statusFromColumn(state.columns, todoColumnId),
+                  priority: template.priority,
+                  assigneeIds: [],
+                  labelIds: [],
+                  dueDate: getRecurringDueDate(monthKey, template.dayOfMonth),
+                  order: columnTasks.length,
+                  createdBy: "user-1",
+                  createdAt: now,
+                  updatedAt: now,
+                  recurrenceTemplateId: template.id,
+                  recurrenceMonth: monthKey,
+                };
+
+                tasks = [...tasks, task];
+                generatedTasks.push(task);
+              });
+
+            return {
+              projects,
+              tasks,
+            };
+          });
+
+          return generatedTasks;
+        },
         createTask: (input) => {
           const now = new Date().toISOString();
           const columnId = input.columnId ?? columnFromStatus(get().columns, "todo") ?? get().columns[0]?.id ?? "";
@@ -280,6 +413,21 @@ export const useTaskStore = create<TaskState>()(
                     updatedAt: new Date().toISOString(),
                   }
                 : goal,
+            ),
+          })),
+        updateRecurringTemplate: (templateId, patch) =>
+          set((state) => ({
+            recurringTemplates: state.recurringTemplates.map((template) =>
+              template.id === templateId
+                ? {
+                    ...template,
+                    ...patch,
+                    dayOfMonth: patch.dayOfMonth
+                      ? clampDayOfMonth(patch.dayOfMonth)
+                      : template.dayOfMonth,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : template,
             ),
           })),
         updateTask: (taskId, patch) =>
@@ -342,17 +490,20 @@ export const useTaskStore = create<TaskState>()(
           const persistedState = (persisted ?? {}) as Partial<TaskState>;
           const persistedProjects = persistedState.projects ?? current.projects;
           const persistedGoals = persistedState.goals ?? current.goals;
+          const persistedTemplates = persistedState.recurringTemplates ?? current.recurringTemplates;
 
           return {
             ...current,
             ...persistedState,
             projects: withDefaultProjects(persistedProjects),
             goals: persistedGoals,
+            recurringTemplates: persistedTemplates,
           };
         },
         partialize: (state) => ({
           projects: state.projects,
           goals: state.goals,
+          recurringTemplates: state.recurringTemplates,
           tasks: state.tasks,
           selectedWorkspaceId: state.selectedWorkspaceId,
           selectedProjectId: state.selectedProjectId,
