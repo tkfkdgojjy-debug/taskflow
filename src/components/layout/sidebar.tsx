@@ -33,9 +33,9 @@ export function Sidebar({ activePath = "/", onNavigate }: SidebarProps) {
   const taskCount = useTaskStore((state) => state.tasks.length);
 
   return (
-    <aside className="flex h-full w-[280px] flex-col rounded-2xl bg-sidebar/88 text-sidebar-foreground shadow-sm backdrop-blur-xl">
+    <aside className="flex h-full w-[280px] flex-col rounded-[2rem] bg-sidebar text-sidebar-foreground shadow-md ring-1 ring-white/55 backdrop-blur-2xl dark:ring-white/10">
       <div className="flex h-[72px] items-center gap-3 px-4">
-        <div className="grid size-10 place-items-center rounded-xl bg-primary/82 text-sm font-bold text-primary-foreground shadow-xs">
+        <div className="grid size-10 place-items-center rounded-2xl bg-[linear-gradient(135deg,#7f8cff,#4f63f2)] text-sm font-bold text-primary-foreground shadow-sm">
           TM
         </div>
         <div className="min-w-0">
@@ -56,15 +56,15 @@ export function Sidebar({ activePath = "/", onNavigate }: SidebarProps) {
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "group flex h-11 items-center gap-3 rounded-full px-3 text-sm font-medium text-sidebar-foreground/62 transition-[background,color,box-shadow,transform] hover:bg-sidebar-accent/82 hover:text-sidebar-accent-foreground",
+                "group flex h-11 items-center gap-3 rounded-full px-3 text-sm font-medium text-sidebar-foreground/62 transition-[background,color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-sidebar-accent/82 hover:text-sidebar-accent-foreground hover:shadow-xs",
                 isActive &&
-                  "bg-card/82 text-sidebar-accent-foreground shadow-xs",
+                  "bg-white/72 text-sidebar-accent-foreground shadow-xs ring-1 ring-white/70 dark:bg-white/10 dark:ring-white/10",
               )}
             >
               <span
                 className={cn(
                   "grid size-7 place-items-center rounded-full text-sidebar-foreground/54 transition-colors group-hover:text-sidebar-accent-foreground",
-                  isActive && "bg-sidebar-primary/24 text-sidebar-accent-foreground shadow-xs",
+                  isActive && "bg-[linear-gradient(135deg,#b7c2ff,#7385ff)] text-white shadow-xs",
                 )}
               >
                 <Icon className="size-4" />
@@ -81,13 +81,13 @@ export function Sidebar({ activePath = "/", onNavigate }: SidebarProps) {
       </nav>
 
       <div className="p-3">
-        <div className="rounded-2xl bg-sidebar-accent/58 p-4">
+        <div className="rounded-[1.75rem] bg-white/42 p-4 shadow-xs ring-1 ring-white/48 dark:bg-white/8 dark:ring-white/10">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium text-sidebar-foreground/58">플랜 사용량</p>
             <span className="text-xs font-semibold">68%</span>
           </div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-background/55">
-            <div className="h-full w-[68%] rounded-full bg-sidebar-primary/88" />
+            <div className="h-full w-[68%] rounded-full bg-[linear-gradient(90deg,#7f8cff,#49b9ff)]" />
           </div>
         </div>
       </div>

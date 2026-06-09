@@ -40,7 +40,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <ToastProvider>
       <DbSyncProvider>
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="relative min-h-screen overflow-hidden text-foreground">
           <div className="hidden md:fixed md:inset-y-4 md:left-4 md:z-40 md:block">
             <Sidebar activePath={pathname} />
           </div>
