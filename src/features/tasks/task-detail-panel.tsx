@@ -18,15 +18,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { defaultClientName, getProjectCategoryLabel } from "@/constants/project-categories";
 import { appTransition, softSpring } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import type { Activity, Project, Task, TaskPriority, TaskStatus, User } from "@/types";
+import type { Activity, Project, Task, TaskChecklistItem, TaskPriority, TaskStatus, User } from "@/types";
 
 type EditableStatus = Extract<TaskStatus, "todo" | "in_progress" | "review" | "done">;
-
-interface ChecklistItem {
-  id: string;
-  label: string;
-  completed: boolean;
-}
 
 interface Comment {
   id: string;
@@ -67,7 +61,7 @@ const priorityTone: Record<TaskPriority, string> = {
   low: "border-sage/35 bg-sage/20 text-[#5f735b] dark:border-sage/35 dark:bg-sage/18 dark:text-[#c9d7c5]",
 };
 
-const defaultChecklist: Record<string, ChecklistItem[]> = {
+const defaultChecklist: Record<string, TaskChecklistItem[]> = {
   "task-1": [
     { id: "check-1", label: "워크스페이스 소유자 모델 확인", completed: true },
     { id: "check-2", label: "작업과 프로젝트 관계 매핑", completed: false },
@@ -150,13 +144,12 @@ export function TaskDetailPanel({
   task,
   users,
 }: TaskDetailPanelProps) {
-  const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>(defaultChecklist);
   const [comments, setComments] = useState<Record<string, Comment[]>>(defaultComments);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [newComment, setNewComment] = useState("");
 
-  const taskChecklist = task ? checklists[task.id] ?? [] : [];
+  const taskChecklist = task ? task.checklistItems ?? defaultChecklist[task.id] ?? [] : [];
   const taskComments = task ? comments[task.id] ?? [] : [];
   const completedChecklist = taskChecklist.filter((item) => item.completed).length;
   const checklistProgress = taskChecklist.length
@@ -193,28 +186,42 @@ export function TaskDetailPanel({
   function toggleChecklistItem(itemId: string) {
     if (!task) return;
 
-    setChecklists((current) => ({
-      ...current,
-      [task.id]: (current[task.id] ?? []).map((item) =>
+    updateTask({
+      checklistItems: taskChecklist.map((item) =>
         item.id === itemId ? { ...item, completed: !item.completed } : item,
       ),
-    }));
+    });
+  }
+
+  function updateChecklistItem(itemId: string, label: string) {
+    if (!task) return;
+
+    updateTask({
+      checklistItems: taskChecklist.map((item) => (item.id === itemId ? { ...item, label } : item)),
+    });
+  }
+
+  function deleteChecklistItem(itemId: string) {
+    if (!task) return;
+
+    updateTask({
+      checklistItems: taskChecklist.filter((item) => item.id !== itemId),
+    });
   }
 
   function addChecklistItem() {
     if (!task || !newChecklistItem.trim()) return;
 
-    setChecklists((current) => ({
-      ...current,
-      [task.id]: [
-        ...(current[task.id] ?? []),
+    updateTask({
+      checklistItems: [
+        ...taskChecklist,
         {
           id: `check-${task.id}-${Date.now()}`,
           label: newChecklistItem.trim(),
           completed: false,
         },
       ],
-    }));
+    });
     setNewChecklistItem("");
   }
 
@@ -380,29 +387,41 @@ export function TaskDetailPanel({
                   </div>
                   <div className="mt-5 space-y-1">
                     {taskChecklist.map((item) => (
-                      <button
+                      <div
                         key={item.id}
-                        type="button"
-                        className="flex w-full items-start gap-3 rounded-lg py-2 text-left transition-colors hover:bg-secondary/55"
-                        onClick={() => toggleChecklistItem(item.id)}
+                        className="group flex w-full items-center gap-3 rounded-lg py-2 pl-0 pr-1 transition-colors hover:bg-secondary/55"
                       >
-                        <span
+                        <button
+                          type="button"
+                          aria-label={`${item.label} 완료 상태 변경`}
                           className={cn(
-                            "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border border-muted-foreground/30",
+                            "grid size-5 shrink-0 place-items-center rounded-full border border-muted-foreground/30",
                             item.completed && "border-primary bg-primary text-primary-foreground",
                           )}
+                          onClick={() => toggleChecklistItem(item.id)}
                         >
                           {item.completed ? <Check className="size-3" /> : null}
-                        </span>
-                        <span
+                        </button>
+                        <input
+                          value={item.label}
+                          onChange={(event) => updateChecklistItem(item.id, event.target.value)}
                           className={cn(
-                            "text-sm leading-5",
+                            "min-w-0 flex-1 rounded-md bg-transparent px-1 py-1 text-sm leading-5 outline-none transition-[background,box-shadow] focus:bg-background/70 focus:shadow-[var(--shadow-focus)]",
                             item.completed && "text-muted-foreground line-through",
                           )}
+                          aria-label="체크리스트 항목 수정"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 shrink-0 text-muted-foreground opacity-100 hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100"
+                          aria-label={`${item.label} 삭제`}
+                          onClick={() => deleteChecklistItem(item.id)}
                         >
-                          {item.label}
-                        </span>
-                      </button>
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
                     ))}
                   </div>
                   <div className="mt-4 flex gap-2">
@@ -410,7 +429,10 @@ export function TaskDetailPanel({
                       value={newChecklistItem}
                       onChange={(event) => setNewChecklistItem(event.target.value)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter") addChecklistItem();
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addChecklistItem();
+                        }
                       }}
                       placeholder="체크리스트 항목 추가"
                       className="h-10 min-w-0 flex-1 rounded-full bg-muted/50 px-4 text-sm outline-none focus:shadow-[var(--shadow-focus)]"

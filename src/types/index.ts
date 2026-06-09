@@ -95,6 +95,12 @@ export interface TaskAttachment {
   createdAt: ISODateString;
 }
 
+export interface TaskChecklistItem {
+  id: ID;
+  label: string;
+  completed: boolean;
+}
+
 export interface Task {
   id: ID;
   workspaceId: ID;
@@ -113,6 +119,7 @@ export interface Task {
   createdAt: ISODateString;
   updatedAt: ISODateString;
   completedAt?: ISODateString;
+  checklistItems?: TaskChecklistItem[];
   recurrenceTemplateId?: ID;
   recurrenceMonth?: string;
 }
