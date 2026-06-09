@@ -190,7 +190,12 @@ export default function DashboardPage() {
                 const project = getTaskProject(task, projects);
 
                 return (
-                  <div key={task.id} className="rounded-2xl bg-background/70 p-4">
+                  <button
+                    key={task.id}
+                    type="button"
+                    className="rounded-2xl bg-background/70 p-4 text-left transition-[background,box-shadow,transform] hover:-translate-y-0.5 hover:bg-secondary/72 hover:shadow-xs"
+                    onClick={() => router.push(`/tasks?task=${task.id}`)}
+                  >
                     <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <Clock3 className="size-3.5" />
                       {task.time}
@@ -200,7 +205,7 @@ export default function DashboardPage() {
                       <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
                       {getProjectDisplay(project)}
                     </div>
-                  </div>
+                  </button>
                 );
               })
             ) : (
@@ -228,7 +233,12 @@ export default function DashboardPage() {
                 const project = getTaskProject(task, projects);
 
                 return (
-                  <div key={task.id} className="rounded-2xl bg-background/70 p-4">
+                  <button
+                    key={task.id}
+                    type="button"
+                    className="w-full rounded-2xl bg-background/70 p-4 text-left transition-[background,box-shadow,transform] hover:-translate-y-0.5 hover:bg-secondary/72 hover:shadow-xs"
+                    onClick={() => router.push(`/tasks?task=${task.id}`)}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="line-clamp-2 text-sm font-semibold">{task.title}</p>
@@ -238,7 +248,7 @@ export default function DashboardPage() {
                         {formatDate(task.dueDate)}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })
             ) : (

@@ -173,11 +173,19 @@ export function TasksPageClient({ activities, labels, users }: TasksPageClientPr
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("create") !== "today") return;
+    const shouldCreateToday = params.get("create") === "today";
+    const taskId = params.get("task");
+    if (!shouldCreateToday && !taskId) return;
 
     const frameId = window.requestAnimationFrame(() => {
-      setIsCreateOpen(true);
-      setNewTaskDueDate((current) => current || getTodayInputValue());
+      if (shouldCreateToday) {
+        setIsCreateOpen(true);
+        setNewTaskDueDate((current) => current || getTodayInputValue());
+      }
+
+      if (taskId) {
+        setSelectedTaskId(taskId);
+      }
     });
     window.history.replaceState(null, "", window.location.pathname);
 
@@ -542,50 +550,78 @@ function TableView({
   tasks,
 }: TaskViewProps) {
   return (
-    <section className="rounded-2xl bg-card/82 p-3 shadow-xs backdrop-blur">
-      <div className="space-y-2">
-        {tasks.map((task) => {
-          const project = getProject(task);
-          const taskLabels = getLabels(task);
+    <section className="rounded-2xl bg-card/82 p-4 shadow-xs backdrop-blur">
+      <div className="space-y-5">
+        {tasks.length > 0 ? (
+          statusColumns.map((column) => {
+            const columnTasks = tasks.filter((task) => task.status === column.value);
+            if (columnTasks.length === 0) return null;
 
-          return (
-            <button
-              key={task.id}
-              type="button"
-              className={cn(
-                "group flex w-full flex-col gap-4 rounded-2xl bg-background/60 p-4 text-left transition-[background,box-shadow,transform] hover:-translate-y-0.5 hover:bg-secondary/72 hover:shadow-xs md:flex-row md:items-center md:justify-between",
-                selectedTaskId === task.id && "bg-secondary/78 shadow-xs ring-2 ring-ring/20",
-              )}
-              onClick={() => onTaskClick(task.id)}
-            >
-              <div className="flex min-w-0 flex-1 items-start gap-3">
-                <StatusButton status={task.status} />
-                <div className="min-w-0">
-                  <p className="line-clamp-1 text-sm font-semibold tracking-tight">{task.title}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
-                      {getProjectDisplay(project)}
+            return (
+              <div key={column.value} className="rounded-2xl bg-background/42 p-3">
+                <div className="mb-3 flex items-center justify-between gap-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <span className="grid size-7 place-items-center rounded-full bg-card/72">
+                      <StatusDot status={column.value} />
                     </span>
-                    {taskLabels.slice(0, 1).map((label) => (
-                      <span key={label.id} className="rounded-full bg-muted/70 px-2 py-0.5">
-                        {label.name}
-                      </span>
-                    ))}
+                    <h2 className="text-sm font-semibold tracking-tight">{column.label}</h2>
                   </div>
+                  <Badge variant="outline" className="rounded-full border-0 bg-card/70 px-2.5">
+                    {columnTasks.length}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {columnTasks.map((task) => {
+                    const project = getProject(task);
+                    const taskLabels = getLabels(task);
+
+                    return (
+                      <button
+                        key={task.id}
+                        type="button"
+                        className={cn(
+                          "group flex w-full flex-col gap-4 rounded-2xl bg-background/60 p-4 text-left transition-[background,box-shadow,transform] hover:-translate-y-0.5 hover:bg-secondary/72 hover:shadow-xs md:flex-row md:items-center md:justify-between",
+                          selectedTaskId === task.id && "bg-secondary/78 shadow-xs ring-2 ring-ring/20",
+                        )}
+                        onClick={() => onTaskClick(task.id)}
+                      >
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          <StatusButton status={task.status} />
+                          <div className="min-w-0">
+                            <p className="line-clamp-1 text-sm font-semibold tracking-tight">{task.title}</p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
+                                {getProjectDisplay(project)}
+                              </span>
+                              {taskLabels.slice(0, 1).map((label) => (
+                                <span key={label.id} className="rounded-full bg-muted/70 px-2 py-0.5">
+                                  {label.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-2 pl-8 md:pl-0">
+                          <PriorityBadge priority={task.priority} />
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/65 px-3 py-1 text-xs font-medium text-muted-foreground">
+                            <CalendarDays className="size-3.5" />
+                            {formatDate(task.dueDate)}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-
-              <div className="flex shrink-0 items-center gap-2 pl-8 md:pl-0">
-                <PriorityBadge priority={task.priority} />
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/65 px-3 py-1 text-xs font-medium text-muted-foreground">
-                  <CalendarDays className="size-3.5" />
-                  {formatDate(task.dueDate)}
-                </span>
-              </div>
-            </button>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div className="grid min-h-32 place-items-center rounded-2xl bg-background/45 p-6 text-center text-sm text-muted-foreground">
+            조건에 맞는 작업이 없습니다.
+          </div>
+        )}
       </div>
     </section>
   );
