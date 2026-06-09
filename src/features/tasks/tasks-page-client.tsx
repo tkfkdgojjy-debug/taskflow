@@ -580,35 +580,48 @@ function TableView({
                         key={task.id}
                         type="button"
                         className={cn(
-                          "group flex w-full flex-col gap-4 rounded-2xl bg-background/60 p-4 text-left transition-[background,box-shadow,transform] hover:-translate-y-0.5 hover:bg-secondary/72 hover:shadow-xs md:flex-row md:items-center md:justify-between",
+                          "group w-full rounded-2xl bg-background/60 p-4 text-left transition-[background,box-shadow,transform] hover:-translate-y-0.5 hover:bg-secondary/72 hover:shadow-xs",
                           selectedTaskId === task.id && "bg-secondary/78 shadow-xs ring-2 ring-ring/20",
                         )}
                         onClick={() => onTaskClick(task.id)}
                       >
-                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <div className="flex min-w-0 items-start gap-3">
                           <StatusButton status={task.status} />
-                          <div className="min-w-0">
-                            <p className="line-clamp-1 text-sm font-semibold tracking-tight">{task.title}</p>
-                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                              <span className="inline-flex items-center gap-1.5">
-                                <span className="size-2 rounded-full" style={{ backgroundColor: project?.color }} />
-                                {getProjectDisplay(project)}
-                              </span>
-                              {taskLabels.slice(0, 1).map((label) => (
-                                <span key={label.id} className="rounded-full bg-muted/70 px-2 py-0.5">
-                                  {label.name}
-                                </span>
-                              ))}
-                            </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-2 text-sm font-semibold tracking-tight">{task.title}</p>
+                            {task.description ? (
+                              <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                                {task.description}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-2 pl-8 md:pl-0">
-                          <PriorityBadge priority={task.priority} />
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/65 px-3 py-1 text-xs font-medium text-muted-foreground">
-                            <CalendarDays className="size-3.5" />
-                            {formatDate(task.dueDate)}
-                          </span>
+                        <div className="mt-4 space-y-3 pl-9">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span className="inline-flex min-w-0 items-center gap-1.5">
+                              <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: project?.color }} />
+                              <span className="truncate">{getProjectDisplay(project)}</span>
+                            </span>
+                            {taskLabels.slice(0, 2).map((label) => (
+                              <span key={label.id} className="rounded-full bg-muted/70 px-2 py-0.5">
+                                {label.name}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <PriorityBadge priority={task.priority} />
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/65 px-3 py-1 text-xs font-medium text-muted-foreground">
+                              <CalendarDays className="size-3.5" />
+                              {formatDate(task.dueDate)}
+                            </span>
+                            {task.checklistItems?.length ? (
+                              <span className="rounded-full bg-muted/65 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                체크 {task.checklistItems.filter((item) => item.completed).length}/
+                                {task.checklistItems.length}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </button>
                     );
